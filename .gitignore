@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+*.egg-info/
+.build_subtr_actor/
+
+# Base de datos y caché (datos personales, no subir)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Electron build output
+electron/node_modules/
+out/
+release/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Archivos temporales de build
+*.whl
+*.whl.dist-info/
+target/

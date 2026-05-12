@@ -1,0 +1,12 @@
+{
+  "name": "rlanalyzer",
+  "version": "0.1.0",
+  "description": "RLAnalyzer - Rocket League Match Analytics",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.3.0"
+  }
+}
