@@ -31,9 +31,9 @@ export default {
           200: '#C2D6F5',
           300: '#94B4DC',
           400: '#6590BC',
-          500: '#436D96',
-          600: '#284F74',
-          700: '#173554',
+          500: '#5888B4',  // era #436D96 — +contraste para labels y cabeceras
+          600: '#3D6A94',  // era #284F74 — +contraste para texto secundario
+          700: '#245070',  // era #173554 — +contraste para texto decorativo
           800: '#0C2040',
           900: '#060F20',
         },

@@ -20,6 +20,9 @@ class Replay(Base):
     team0_score   = Column(Integer, nullable=True)
     team1_score   = Column(Integer, nullable=True)
     is_solo_queue = Column(Boolean, default=True)
+    is_favorite   = Column(Boolean, default=False)
+    playlist_id   = Column(Integer, nullable=True)
+    game_category = Column(String, nullable=True)  # "Ranked" | "Extra" | "Casual"
     raw_meta      = Column(Text, nullable=True)     # JSON crudo de subtr-actor (debug)
     processed_at  = Column(DateTime, default=datetime.utcnow)
 

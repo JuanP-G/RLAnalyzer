@@ -111,7 +111,7 @@ function ErrorBox({ error, onRetry }) {
 
       {/* Pasos intentados */}
       <div className="rounded-lg p-3 mb-4" style={{ background: '#04101E', border: '1px solid #122A4D' }}>
-        <p className="text-gray-600 text-[11px] uppercase tracking-wider font-display mb-2">Capas de fallback intentadas</p>
+        <p className="text-gray-400 text-[11px] uppercase tracking-wider font-display mb-2">Capas de fallback intentadas</p>
         {[
           { label: '1. tracker.gg API',        desc: 'api.tracker.gg/v2/...', fail: true },
           { label: '2. Web scraping',           desc: 'rocketleague.tracker.network', fail: true },
@@ -119,18 +119,18 @@ function ErrorBox({ error, onRetry }) {
         ].map(({ label, desc, fail }) => (
           <div key={label} className="flex items-center gap-2 py-1">
             <span style={{ color: fail ? '#FF4757' : '#3DDB85', fontSize: 11 }}>{fail ? '✗' : '✓'}</span>
-            <span className="text-gray-500 text-xs font-display font-semibold">{label}</span>
-            <span className="text-gray-700 text-[10px] font-mono">{desc}</span>
+            <span className="text-gray-300 text-xs font-display font-semibold">{label}</span>
+            <span className="text-gray-500 text-[10px] font-mono">{desc}</span>
           </div>
         ))}
       </div>
 
       {/* Solución */}
       <div className="rounded-lg p-3" style={{ background: '#04101E', border: '1px solid #122A4D' }}>
-        <p className="text-gray-600 text-[11px] uppercase tracking-wider font-display mb-2">Solución — cuando llegue tu API key</p>
-        <p className="text-gray-600 text-[10px] mb-1 font-mono"># backend/routers/profile.py  línea 18</p>
+        <p className="text-gray-400 text-[11px] uppercase tracking-wider font-display mb-2">Solución — cuando llegue tu API key</p>
+        <p className="text-gray-400 text-[10px] mb-1 font-mono"># backend/routers/profile.py  línea 18</p>
         <p className="text-rl-blue text-xs font-mono">TRACKER_API_KEY = <span className="text-win">"pega-tu-key-aquí"</span></p>
-        <p className="text-gray-600 text-[10px] mt-1 font-mono"># Luego reinicia el backend (cierra y vuelve a abrir start.bat)</p>
+        <p className="text-gray-400 text-[10px] mt-1 font-mono"># Luego reinicia el backend (cierra y vuelve a abrir start.bat)</p>
       </div>
 
       <button onClick={onRetry}
@@ -184,16 +184,16 @@ function RankCard({ playlist, index }) {
             {playlist.tierName || 'Sin clasificar'}
           </p>
           {playlist.divisionName && (
-            <p className="text-gray-500 text-xs mt-0.5">{playlist.divisionName}</p>
+            <p className="text-gray-400 text-xs mt-0.5">{playlist.divisionName}</p>
           )}
           {playlist.mmr != null && (
             <p className="font-mono-num font-bold text-xl leading-tight mt-1.5" style={{ color: meta.color }}>
               {Math.round(playlist.mmr)}{' '}
-              <span className="text-xs font-sans font-normal text-gray-600">MMR</span>
+              <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
             </p>
           )}
           {playlist.peak != null && (
-            <p className="text-gray-600 text-[10px] mt-0.5 font-mono-num">
+            <p className="text-gray-500 text-[10px] mt-0.5 font-mono-num">
               Pico: {Math.round(playlist.peak)} MMR
             </p>
           )}
@@ -249,8 +249,8 @@ function RankCard({ playlist, index }) {
           { label: 'Racha',    value: streakStr, style: streakStr ? { color: streakColor } : undefined },
         ].map(({ label, value, style }) => (
           <div key={label} className="text-center">
-            <p className="text-gray-700 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
-            <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#9AB5D8' }}>
+            <p className="text-gray-500 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
+            <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#C2D6F5' }}>
               {value ?? '—'}
             </p>
           </div>
@@ -289,7 +289,7 @@ function MmrChart({ history, playlists }) {
   return (
     <div className="rounded-xl p-5" style={{ background: '#071829', border: '1px solid #122A4D' }}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-semibold text-gray-500 text-xs uppercase tracking-widest">
+        <h3 className="font-display font-semibold text-gray-300 text-xs uppercase tracking-widest">
           Evolución de MMR
         </h3>
         <div className="flex gap-1.5 flex-wrap justify-end">
@@ -306,8 +306,8 @@ function MmrChart({ history, playlists }) {
                 className="px-2 py-0.5 rounded text-[10px] font-display font-semibold uppercase tracking-wide transition-all"
                 style={{
                   background: on ? `${m?.color}22` : '#0D2240',
-                  color:      on ? m?.color : '#2A4A68',
-                  border:     `1px solid ${on ? `${m?.color}55` : '#122A4D'}`,
+                  color:      on ? m?.color : '#5888B4',
+                  border:     `1px solid ${on ? `${m?.color}55` : '#1A3A5C'}`,
                 }}
               >
                 {m?.label?.split(' — ')[0] || id}
@@ -320,13 +320,13 @@ function MmrChart({ history, playlists }) {
         <LineChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
           <CartesianGrid stroke="#0D2240" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="date" tickFormatter={fmtDate}
-            tick={{ fill: '#2A4A68', fontSize: 10 }} axisLine={false} tickLine={false}
+            tick={{ fill: '#5888B4', fontSize: 10 }} axisLine={false} tickLine={false}
             interval="preserveStartEnd" />
-          <YAxis tick={{ fill: '#2A4A68', fontSize: 10 }} axisLine={false} tickLine={false}
+          <YAxis tick={{ fill: '#5888B4', fontSize: 10 }} axisLine={false} tickLine={false}
             domain={['auto', 'auto']} />
           <Tooltip
             contentStyle={{ background: '#071829', border: '1px solid #1A3A5C', borderRadius: '10px', fontSize: 11 }}
-            labelStyle={{ color: '#6A90BC', marginBottom: 4 }}
+            labelStyle={{ color: '#94B4DC', marginBottom: 4 }}
             formatter={(v, name) => {
               const id = parseInt(name.replace('pl_', ''))
               return [`${v} MMR`, PLAYLIST_META[id]?.label || name]
@@ -357,7 +357,7 @@ function CareerStats({ overview }) {
     <div className="rounded-xl overflow-hidden" style={{ background: '#071829', border: '1px solid #122A4D' }}>
       {/* Header */}
       <div className="px-4 py-3" style={{ background: '#04101E', borderBottom: '1px solid #0D2240' }}>
-        <h3 className="font-display font-semibold text-gray-500 text-xs uppercase tracking-widest">
+        <h3 className="font-display font-semibold text-gray-300 text-xs uppercase tracking-widest">
           Carrera acumulada
         </h3>
       </div>
@@ -369,7 +369,7 @@ function CareerStats({ overview }) {
           return (
             <div key={key} className="flex items-center justify-between px-4 py-2.5 hover:bg-bg-hover transition-colors"
                  style={{ borderBottom: i < entries.length - 1 ? '1px solid #071829' : 'none' }}>
-              <span className="text-gray-500 text-xs font-display uppercase tracking-wide">
+              <span className="text-gray-300 text-xs font-display uppercase tracking-wide">
                 {stat.label || label}
               </span>
               <span className="font-mono-num font-bold text-sm" style={{ color }}>
@@ -456,7 +456,7 @@ export default function Profile() {
                 {profile.platform || 'Epic'}
               </span>
               {profile.currentSeason && (
-                <span className="text-gray-600 text-xs">Temporada {profile.currentSeason}</span>
+                <span className="text-gray-400 text-xs">Temporada {profile.currentSeason}</span>
               )}
               {profile._stale && (
                 <span className="text-[10px] px-2 py-0.5 rounded font-display uppercase tracking-wider"
@@ -468,10 +468,10 @@ export default function Profile() {
           </div>
           <div className="text-right flex-shrink-0">
             {profile.lastUpdated && (
-              <p className="text-gray-700 text-xs">Actualizado {timeAgo(profile.lastUpdated)}</p>
+              <p className="text-gray-400 text-xs">Actualizado {timeAgo(profile.lastUpdated)}</p>
             )}
             <button onClick={() => load(true)}
-              className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-white transition-all"
+              className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition-all"
               style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>
               ↻ Actualizar
             </button>
@@ -491,7 +491,7 @@ export default function Profile() {
               const casual = profile.playlists.filter(p => !COMP.includes(p.playlistId) && !EXTRA.includes(p.playlistId))
 
               const SectionLabel = ({ children }) => (
-                <h2 className="font-display font-semibold text-gray-600 text-[10px] uppercase tracking-widest mb-2.5 flex items-center gap-2">
+                <h2 className="font-display font-semibold text-gray-400 text-[10px] uppercase tracking-widest mb-2.5 flex items-center gap-2">
                   <span className="flex-1 h-px" style={{ background: '#0D2240' }} />
                   {children}
                   <span className="flex-1 h-px" style={{ background: '#0D2240' }} />
@@ -537,12 +537,23 @@ export default function Profile() {
             {history && profile.playlists?.length > 0 && (
               <MmrChart history={history} playlists={profile.playlists} />
             )}
+
+            {/* Pie — alineado con la columna de rangos */}
+            <p className="text-gray-500 text-xs text-center pb-1">
+              Datos de{' '}
+              <a href={`https://rocketleague.tracker.network/rocket-league/profile/epic/${profile.username}/overview`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="text-gray-400 hover:text-gray-300 transition-colors underline underline-offset-2">
+                tracker.gg
+              </a>
+              {' '}· Caché de 10 minutos
+            </p>
           </div>
 
           {/* Columna derecha — stats de carrera */}
           {hasCareer && (
             <div className="flex-shrink-0 w-64">
-              <h2 className="font-display font-semibold text-gray-600 text-xs uppercase tracking-widest mb-3">
+              <h2 className="font-display font-semibold text-gray-300 text-xs uppercase tracking-widest mb-3">
                 Estadísticas
               </h2>
               <CareerStats overview={ov} />
@@ -550,17 +561,6 @@ export default function Profile() {
           )}
 
         </div>
-
-        {/* Pie */}
-        <p className="text-gray-800 text-xs text-center pb-2">
-          Datos de{' '}
-          <a href={`https://rocketleague.tracker.network/rocket-league/profile/epic/${profile.username}/overview`}
-             target="_blank" rel="noopener noreferrer"
-             className="hover:text-gray-600 transition-colors">
-            tracker.gg
-          </a>
-          {' '}· Caché de 10 minutos
-        </p>
 
       </div>
     </div>

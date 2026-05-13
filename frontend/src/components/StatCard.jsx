@@ -10,13 +10,13 @@ export default function StatCard({ label, value, sub, color = 'text-rl-blue', la
         className="absolute top-0 left-0 right-0 h-[2px]"
         style={{ background: `linear-gradient(90deg, transparent, ${accent}99, transparent)` }}
       />
-      <p className="text-gray-500 text-[11px] uppercase tracking-wider font-display font-semibold">
+      <p className="text-gray-300 text-[11px] uppercase tracking-wider font-display font-semibold">
         {label}
       </p>
       <p className={`font-mono-num font-bold leading-none ${large ? 'text-3xl mt-1' : 'text-2xl mt-0.5'} ${color}`}>
         {value ?? '—'}
       </p>
-      {sub && <p className="text-gray-600 text-[11px] mt-0.5">{sub}</p>}
+      {sub && <p className="text-gray-400 text-[11px] mt-0.5">{sub}</p>}
     </div>
   )
 }

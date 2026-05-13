@@ -35,12 +35,56 @@ function formatDuration(secs) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function StarButton({ isFav, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={isFav ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+      className="transition-transform hover:scale-125 focus:outline-none"
+      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
+    >
+      {isFav
+        ? <span style={{ color: '#F5C542', fontSize: '1rem' }}>★</span>
+        : <span style={{ color: '#3A5A7A', fontSize: '1rem' }}>☆</span>}
+    </button>
+  )
+}
+
+// ── FilterChip ────────────────────────────────────────────────────────────────
+function FilterChip({ label, active, onClick, color }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1 rounded-full text-xs font-semibold transition-all"
+      style={{
+        background: active ? (color ? `${color}22` : '#1A3A5C') : '#071829',
+        color:      active ? (color || '#7AADD4') : '#5888B4',
+        border:     `1px solid ${active ? (color ? `${color}55` : '#2E5A8C') : '#122A4D'}`,
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
 export default function ReplayList() {
-  const [replays, setReplays] = useState([])
-  const [total,   setTotal]   = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [page,    setPage]    = useState(0)
-  const [limit,   setLimit]   = useState(15)
+  const [replays,    setReplays]    = useState([])
+  const [total,      setTotal]      = useState(0)
+  const [loading,    setLoading]    = useState(true)
+  const [page,       setPage]       = useState(0)
+  const [limit,      setLimit]      = useState(15)
+  const [favOnly,         setFavOnly]         = useState(false)
+  const [filterResult,    setFilterResult]    = useState(null)   // null | 'win' | 'loss'
+  const [filterTeamSize,  setFilterTeamSize]  = useState(null)   // null | 1 | 2 | 3
+
+  const hasFilters = favOnly || filterResult || filterTeamSize
+
+  const clearFilters = useCallback(() => {
+    setFavOnly(false)
+    setFilterResult(null)
+    setFilterTeamSize(null)
+    setPage(0)
+  }, [])
 
   // Refs para medir el espacio disponible real en el DOM
   const tableBoxRef = useRef(null)  // div que envuelve toda la tabla (flex-1)
@@ -85,26 +129,86 @@ export default function ReplayList() {
     if (replays.length > 0) recalc()
   }, [replays, recalc])
 
+  // Reset página al cambiar filtros
+  const resetPage = useCallback(() => setPage(0), [])
+
   // Carga de datos
   useEffect(() => {
     setLoading(true)
-    api.replays(page * limit, limit)
+    const filters = {}
+    if (favOnly)        filters.favorite  = true
+    if (filterResult)   filters.result    = filterResult
+    if (filterTeamSize) filters.team_size = filterTeamSize
+    api.replays(page * limit, limit, filters)
       .then(d => { setReplays(d.replays); setTotal(d.total) })
       .finally(() => setLoading(false))
-  }, [page, limit])
+  }, [page, limit, favOnly, filterResult, filterTeamSize])
+
+  const toggleFavorite = useCallback((replay, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const newVal = !replay.is_favorite
+    // Actualización optimista
+    setReplays(prev => prev.map(r => r.id === replay.id ? { ...r, is_favorite: newVal } : r))
+    api.setFavorite(replay.id, newVal).catch(() => {
+      // Revertir si falla
+      setReplays(prev => prev.map(r => r.id === replay.id ? { ...r, is_favorite: !newVal } : r))
+    })
+  }, [])
 
   const totalPages = Math.ceil(total / limit)
 
   return (
     <div className="h-full flex flex-col px-8 py-6 gap-4 overflow-hidden">
 
-      {/* Título */}
-      <div className="flex-shrink-0 flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-bold text-gray-100 uppercase tracking-wider" style={{ fontSize: '1.25rem' }}>
-            Partidas
-          </h2>
-          <p className="text-gray-500 text-xs mt-0.5">{total} en total</p>
+      {/* Título + filtros */}
+      <div className="flex-shrink-0 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display font-bold text-gray-100 uppercase tracking-wider" style={{ fontSize: '1.25rem' }}>
+              Partidas
+            </h2>
+            <p className="text-gray-400 text-xs mt-0.5">{total} en total</p>
+          </div>
+        </div>
+
+        {/* Fila de filtros */}
+        <div className="flex items-center gap-4 flex-wrap">
+
+          {/* Resultado */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500 text-[10px] uppercase tracking-wider font-display font-semibold mr-0.5">Resultado</span>
+            <FilterChip label="Todos"    active={!filterResult}          onClick={() => { setFilterResult(null);  setPage(0) }} />
+            <FilterChip label="Victoria" active={filterResult === 'win'} onClick={() => { setFilterResult(filterResult === 'win'  ? null : 'win');  setPage(0) }} color="#3DDB85" />
+            <FilterChip label="Derrota"  active={filterResult === 'loss'} onClick={() => { setFilterResult(filterResult === 'loss' ? null : 'loss'); setPage(0) }} color="#FF4757" />
+          </div>
+
+          <div className="w-px h-4 flex-shrink-0" style={{ background: '#122A4D' }} />
+
+          {/* Modo (team size) */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500 text-[10px] uppercase tracking-wider font-display font-semibold mr-0.5">Modo</span>
+            <FilterChip label="Todos" active={!filterTeamSize}        onClick={() => { setFilterTeamSize(null); setPage(0) }} />
+            <FilterChip label="1v1"   active={filterTeamSize === 1}   onClick={() => { setFilterTeamSize(filterTeamSize === 1 ? null : 1); setPage(0) }} />
+            <FilterChip label="2v2"   active={filterTeamSize === 2}   onClick={() => { setFilterTeamSize(filterTeamSize === 2 ? null : 2); setPage(0) }} />
+            <FilterChip label="3v3"   active={filterTeamSize === 3}   onClick={() => { setFilterTeamSize(filterTeamSize === 3 ? null : 3); setPage(0) }} />
+          </div>
+
+          <div className="w-px h-4 flex-shrink-0" style={{ background: '#122A4D' }} />
+
+          {/* Favoritas */}
+          <button
+            onClick={() => { setFavOnly(!favOnly); setPage(0) }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all"
+            style={{
+              background: favOnly ? '#1A3A5C' : '#071829',
+              border: `1px solid ${favOnly ? '#F5C542' : '#122A4D'}`,
+              color: favOnly ? '#F5C542' : '#5888B4',
+            }}
+          >
+            <span style={{ fontSize: '0.85rem' }}>{favOnly ? '★' : '☆'}</span>
+            Favoritas
+          </button>
         </div>
       </div>
 
@@ -120,11 +224,25 @@ export default function ReplayList() {
           {loading ? (
             <div className="h-full flex items-center justify-center text-gray-500">Cargando...</div>
           ) : replays.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-500">Sin partidas registradas aún.</div>
+            <div className="h-full flex flex-col items-center justify-center gap-3">
+              {hasFilters ? (
+                <>
+                  <p className="text-gray-400 text-sm">No hay partidas con estos filtros.</p>
+                  <button onClick={clearFilters}
+                    className="px-4 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+                    style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>
+                    × Limpiar filtros
+                  </button>
+                </>
+              ) : (
+                <p className="text-gray-500">Sin partidas registradas aún.</p>
+              )}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead ref={theadRef}>
-                <tr className="text-xs uppercase tracking-widest font-display font-semibold" style={{ background: '#071829', borderBottom: '1px solid #122A4D', color: '#436D96' }}>
+                <tr className="text-xs uppercase tracking-widest font-display font-semibold" style={{ background: '#071829', borderBottom: '1px solid #122A4D', color: '#7AADD4' }}>
+                  <th className="px-2 py-3 text-center w-8"></th>
                   <th className="px-4 py-3 text-left">Resultado</th>
                   <th className="px-4 py-3 text-left">Mapa</th>
                   <th className="px-4 py-3 text-left">Modo</th>
@@ -141,11 +259,14 @@ export default function ReplayList() {
                     className="transition-colors hover:bg-bg-hover"
                     style={{ borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240' }}
                   >
+                    <td className="px-2 py-3 text-center w-8">
+                      <StarButton isFav={r.is_favorite} onClick={(e) => toggleFavorite(r, e)} />
+                    </td>
                     <td className="px-4 py-3"><ResultBadge result={r.result} /></td>
                     <td className="px-4 py-3 text-gray-200 truncate max-w-[200px]">
                       {getMapName(r.map_name)}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
+                    <td className="px-4 py-3 text-gray-300 text-xs">
                       {r.team_size ? `${r.team_size}v${r.team_size}` : ''}
                       {r.match_type ? ` ${r.match_type}` : ''}
                     </td>
@@ -156,10 +277,10 @@ export default function ReplayList() {
                           </span>
                         : '—'}
                     </td>
-                    <td className="px-4 py-3 font-mono-num text-gray-400">
+                    <td className="px-4 py-3 font-mono-num text-gray-300">
                       {formatDuration(r.duration_secs)}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
+                    <td className="px-4 py-3 text-gray-400 text-xs">
                       {formatDate(r.played_at)}
                     </td>
                     <td className="px-4 py-3">

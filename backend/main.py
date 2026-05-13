@@ -50,6 +50,8 @@ def save_replay_to_db(data: dict):
             map_name      = data["map_name"],
             match_type    = data["match_type"],
             team_size     = data["team_size"],
+            playlist_id   = data.get("playlist_id"),
+            game_category = data.get("game_category"),
             duration_secs = data["duration_secs"],
             played_at     = data["played_at"],
             result        = data["result"],

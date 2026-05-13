@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
+from pydantic import BaseModel
 import logging
 
 from database import get_db
@@ -31,7 +32,8 @@ def replay_to_dict(r: Replay, include_players: bool = False) -> dict:
         "my_team":      r.my_team,
         "team0_score":  r.team0_score,
         "team1_score":  r.team1_score,
-        "is_solo_queue":r.is_solo_queue,
+        "is_solo_queue":  r.is_solo_queue,
+        "is_favorite":    bool(r.is_favorite),
         "processed_at": r.processed_at.isoformat() if r.processed_at else None,
     }
     if include_players:
@@ -73,18 +75,39 @@ def list_replays(
     skip: int = 0,
     limit: int = 50,
     result: Optional[str] = None,
+    favorite: Optional[int] = None,
+    team_size: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     """Lista de replays, más recientes primero."""
     q = db.query(Replay).order_by(desc(Replay.played_at))
     if result:
         q = q.filter(Replay.result == result)
+    if favorite == 1:
+        q = q.filter(Replay.is_favorite == True)
+    if team_size is not None:
+        q = q.filter(Replay.team_size == team_size)
     total = q.count()
     replays = q.offset(skip).limit(limit).all()
     return {
         "total": total,
         "replays": [replay_to_dict(r) for r in replays],
     }
+
+
+class FavoritePayload(BaseModel):
+    value: bool
+
+
+@router.patch("/replays/{replay_id}/favorite")
+def set_favorite(replay_id: int, body: FavoritePayload, db: Session = Depends(get_db)):
+    """Marca o desmarca un replay como favorito."""
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Replay no encontrado")
+    r.is_favorite = body.value
+    db.commit()
+    return {"id": replay_id, "is_favorite": r.is_favorite}
 
 
 @router.get("/replays/{replay_id}")
@@ -184,6 +207,7 @@ def get_my_stats(db: Session = Depends(get_db)):
         "wins":    compute_avgs("win"),
         "losses":  compute_avgs("loss"),
     }
+
 
 
 @router.get("/status")

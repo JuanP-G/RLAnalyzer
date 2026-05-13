@@ -61,12 +61,13 @@ def parse_replay(file_path: str) -> Optional[dict]:
 
         props = _safe_get(full_replay, "properties") or {}
 
-        map_name   = _safe_get(props, "MapName")
-        match_type = _safe_get(props, "MatchType")
-        num_frames = _safe_get(props, "NumFrames")
-        record_fps = _safe_get(props, "RecordFPS") or 30.0
-        date_str   = _safe_get(props, "Date")
-        team_size  = _safe_get(props, "TeamSize")
+        map_name    = _safe_get(props, "MapName")
+        match_type  = _safe_get(props, "MatchType")
+        num_frames  = _safe_get(props, "NumFrames")
+        record_fps  = _safe_get(props, "RecordFPS") or 30.0
+        date_str    = _safe_get(props, "Date")
+        team_size   = _safe_get(props, "TeamSize")
+        playlist_id = _safe_get(props, "PlaylistId")
 
         duration_secs = (num_frames / record_fps) if num_frames else None
 
@@ -204,12 +205,29 @@ def parse_replay(file_path: str) -> Optional[dict]:
             f"{team0_goals}-{team1_goals} | {len(players)} jugadores | {result}"
         )
 
+        # Categoría de partida basada en playlist_id de Rocket League
+        # Ranked estándar: 10 (1v1), 11 (2v2), 13 (3v3), 34 (4v4)
+        # Modos Extra:     27 (Hoops), 28 (Rumble), 29 (Dropshot), 30 (Snowday)
+        # Casual:          el resto (0, 6, 7, 8, etc.)
+        _RANKED_IDS = {10, 11, 13, 34}
+        _EXTRA_IDS  = {27, 28, 29, 30}
+        if playlist_id in _RANKED_IDS:
+            game_category = "Ranked"
+        elif playlist_id in _EXTRA_IDS:
+            game_category = "Extra"
+        elif playlist_id is not None:
+            game_category = "Casual"
+        else:
+            game_category = None
+
         return {
             "file_path":     str(path),
             "file_name":     path.name,
             "map_name":      map_name,
             "match_type":    match_type,
             "team_size":     team_size,
+            "playlist_id":   playlist_id,
+            "game_category": game_category,
             "duration_secs": duration_secs,
             "played_at":     played_at,
             "result":        result,

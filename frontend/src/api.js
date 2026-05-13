@@ -35,8 +35,21 @@ export const api = {
   status:         ()                     => fetchJSON(`${BASE}/status`),
   summary:        ()                     => fetchJSON(`${BASE}/stats/summary`),
   myStats:        ()                     => fetchJSON(`${BASE}/stats/me`),
-  replays:        (skip = 0, limit = 50) => fetchJSON(`${BASE}/replays?skip=${skip}&limit=${limit}`),
+  replays:        (skip = 0, limit = 50, filters = {}) => {
+    const p = new URLSearchParams({ skip, limit })
+    if (filters.result)        p.set('result',        filters.result)
+    if (filters.favorite)      p.set('favorite',      '1')
+    if (filters.team_size)     p.set('team_size',     filters.team_size)
+    if (filters.match_type)    p.set('match_type',    filters.match_type)
+    if (filters.game_category) p.set('game_category', filters.game_category)
+    return fetchJSON(`${BASE}/replays?${p}`)
+  },
   replay:         (id)                   => fetchJSON(`${BASE}/replays/${id}`),
+  setFavorite:    (id, value)            => fetch(`${BASE}/replays/${id}/favorite`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value }),
+                  }).then(r => { if (!r.ok) throw new Error('Error al actualizar favorito'); return r.json() }),
   profile:        ()                     => cached('profile',        () => fetchJSON(`${BASE}/profile`)),
   profileHistory: ()                     => cached('profileHistory', () => fetchJSON(`${BASE}/profile/history`)),
 }

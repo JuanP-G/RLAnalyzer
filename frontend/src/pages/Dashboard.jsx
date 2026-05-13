@@ -36,6 +36,21 @@ function formatDate(iso) {
     + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
+function StarButton({ isFav, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={isFav ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+      className="transition-transform hover:scale-125 focus:outline-none"
+      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
+    >
+      {isFav
+        ? <span style={{ color: '#F5C542', fontSize: '1rem' }}>★</span>
+        : <span style={{ color: '#3A5A7A', fontSize: '1rem' }}>☆</span>}
+    </button>
+  )
+}
+
 export default function Dashboard() {
   const [summary, setSummary] = useState(null)
   const [replays, setReplays] = useState([])
@@ -83,6 +98,16 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
   }, [limit])
 
+  const toggleFavorite = useCallback((replay, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const newVal = !replay.is_favorite
+    setReplays(prev => prev.map(r => r.id === replay.id ? { ...r, is_favorite: newVal } : r))
+    api.setFavorite(replay.id, newVal).catch(() => {
+      setReplays(prev => prev.map(r => r.id === replay.id ? { ...r, is_favorite: !newVal } : r))
+    })
+  }, [])
+
   if (loading) return (
     <div className="flex items-center justify-center h-full text-gray-500">
       Cargando datos...
@@ -117,7 +142,7 @@ export default function Dashboard() {
 
       {/* KPIs */}
       <section className="flex-shrink-0">
-        <h2 className="font-display font-semibold text-gray-500 text-sm uppercase tracking-widest mb-3">Resumen global</h2>
+        <h2 className="font-display font-semibold text-gray-300 text-sm uppercase tracking-widest mb-3">Resumen global</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           <StatCard label="Partidas"   value={summary.total_replays} large />
           <StatCard label="Victorias"  value={summary.wins}   color="text-win" />
@@ -132,7 +157,7 @@ export default function Dashboard() {
       {/* Últimas partidas — llena el espacio restante sin scroll */}
       <section className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <h2 className="font-display font-semibold text-gray-500 text-sm uppercase tracking-widest">Últimas partidas</h2>
+          <h2 className="font-display font-semibold text-gray-300 text-sm uppercase tracking-widest">Últimas partidas</h2>
           <Link to="/replays" className="text-rl-blue text-xs hover:underline">Ver todas →</Link>
         </div>
 
@@ -143,7 +168,8 @@ export default function Dashboard() {
         >
           <table className="w-full text-sm">
             <thead ref={theadRef}>
-              <tr className="text-xs uppercase tracking-widest font-display font-semibold" style={{ background: '#071829', borderBottom: '1px solid #122A4D', color: '#436D96' }}>
+              <tr className="text-xs uppercase tracking-widest font-display font-semibold" style={{ background: '#071829', borderBottom: '1px solid #122A4D', color: '#7AADD4' }}>
+                <th className="px-2 py-3 text-center w-8"></th>
                 <th className="px-4 py-3 text-left">Resultado</th>
                 <th className="px-4 py-3 text-left">Mapa</th>
                 <th className="px-4 py-3 text-left">Modo</th>
@@ -160,15 +186,18 @@ export default function Dashboard() {
                   className="transition-colors hover:bg-bg-hover"
                   style={{ borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240' }}
                 >
+                  <td className="px-2 py-3 text-center w-8">
+                    <StarButton isFav={r.is_favorite} onClick={(e) => toggleFavorite(r, e)} />
+                  </td>
                   <td className="px-4 py-3">
                     <ResultBadge result={r.result} />
                   </td>
                   <td className="px-4 py-3 text-gray-200 font-medium truncate max-w-[180px]">
                     {getMapName(r.map_name)}
                   </td>
-                  <td className="px-4 py-3 text-gray-400">
+                  <td className="px-4 py-3 text-gray-300">
                     {r.match_type ? (
-                      <span className="text-xs bg-bg-tertiary px-2 py-0.5 rounded">
+                      <span className="text-xs bg-bg-tertiary px-2 py-0.5 rounded text-gray-200">
                         {r.team_size}v{r.team_size} {r.match_type}
                       </span>
                     ) : '—'}
@@ -177,10 +206,10 @@ export default function Dashboard() {
                     {r.team0_score != null && r.team1_score != null
                       ? `${r.team0_score} - ${r.team1_score}` : '—'}
                   </td>
-                  <td className="px-4 py-3 font-mono-num text-gray-400">
+                  <td className="px-4 py-3 font-mono-num text-gray-300">
                     {formatDuration(r.duration_secs)}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-gray-400 text-xs">
                     {formatDate(r.played_at)}
                   </td>
                   <td className="px-4 py-3">
