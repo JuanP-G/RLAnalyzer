@@ -440,6 +440,30 @@ def diagnose_profile():
         result["internet_ok"] = False
         result["internet_error"] = str(e)
 
+    # Test API sin key — a veces funciona con headers de navegador puro
+    api_url_nokey = (
+        f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
+        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}"
+    )
+    try:
+        req = Request(api_url_nokey, headers={
+            "User-Agent": _UA,
+            "Accept": "application/json",
+            "Referer": "https://rocketleague.tracker.network/",
+        })
+        with urlopen(req, timeout=15) as r:
+            d = json.loads(r.read().decode())
+        result["api_nokey_status"] = "OK"
+        result["api_nokey_segments"] = len(d.get("data", {}).get("segments", []))
+    except HTTPError as e:
+        result["api_nokey_status"] = f"HTTP {e.code}"
+        try:
+            result["api_nokey_error"] = e.read().decode("utf-8", "replace")[:200]
+        except Exception:
+            pass
+    except Exception as e:
+        result["api_nokey_status"] = f"Error: {e}"
+
     # Test API directo — muestra el error HTTP exacto
     api_url = (
         f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
@@ -472,34 +496,21 @@ def diagnose_profile():
         result["scrape_has_next_data"]     = "__NEXT_DATA__" in html
         result["scrape_has_initial_state"] = "__INITIAL_STATE__" in html
 
-        # Intentar extraer __INITIAL_STATE__ y mostrar su estructura
+        # Inspeccionar __INITIAL_STATE__ en detalle
         raw = _extract_json_at(html, "window.__INITIAL_STATE__")
         if raw:
             result["initial_state_extracted_len"] = len(raw)
             try:
                 obj = json.loads(raw)
-                result["initial_state_top_keys"] = list(obj.keys())[:20]
-                # Buscar cualquier clave que contenga "segment" o "profile"
-                def find_keys(o, prefix="", depth=0):
-                    if depth > 4 or not isinstance(o, dict):
-                        return []
-                    keys = []
-                    for k, v in o.items():
-                        full = f"{prefix}.{k}" if prefix else k
-                        if any(x in k.lower() for x in ("segment", "profile", "playlist", "tier", "rating")):
-                            keys.append(f"{full} ({type(v).__name__})")
-                        keys += find_keys(v, full, depth + 1)
-                    return keys
-                result["initial_state_interesting_keys"] = find_keys(obj)[:30]
+                stats_obj = obj.get("stats", {})
+                segments  = stats_obj.get("segments") or []
+                profiles  = stats_obj.get("standardProfiles") or []
+                result["initial_state_stats_segments_count"]  = len(segments)
+                result["initial_state_stats_profiles_count"]  = len(profiles)
+                result["initial_state_stats_segments_sample"] = segments[:1]   # primer segmento si existe
+                result["initial_state_stats_profiles_sample"] = profiles[:1]   # primer perfil si existe
             except Exception as e:
                 result["initial_state_parse_error"] = str(e)
-                result["initial_state_raw_sample"] = raw[:300]
-        else:
-            result["initial_state_extracted"] = "No se pudo extraer con balance de llaves"
-            # Mostrar fragmento del HTML alrededor de __INITIAL_STATE__
-            idx = html.find("__INITIAL_STATE__")
-            if idx != -1:
-                result["initial_state_html_snippet"] = html[idx:idx+200]
 
         # Scripts inline que contienen "segments"
         scripts_with_segments = []
