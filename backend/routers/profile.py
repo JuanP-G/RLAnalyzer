@@ -440,7 +440,7 @@ def diagnose_profile():
     except Exception as e:
         result["api_status"] = f"Error: {type(e).__name__}: {e}"
 
-    # Test scraping — muestra cuántos bytes obtuvo y si encontró los datos
+    # Test scraping — inspección profunda de la estructura del HTML
     scrape_url = (
         f"https://rocketleague.tracker.network/rocket-league/profile"
         f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}/overview"
@@ -449,10 +449,47 @@ def diagnose_profile():
     try:
         html = _get_html(scrape_url)
         result["scrape_bytes"] = len(html)
-        result["scrape_has_next_data"] = "__NEXT_DATA__" in html
+        result["scrape_has_next_data"]     = "__NEXT_DATA__" in html
         result["scrape_has_initial_state"] = "__INITIAL_STATE__" in html
+
+        # Intentar extraer __INITIAL_STATE__ y mostrar su estructura
+        raw = _extract_json_at(html, "window.__INITIAL_STATE__")
+        if raw:
+            result["initial_state_extracted_len"] = len(raw)
+            try:
+                obj = json.loads(raw)
+                result["initial_state_top_keys"] = list(obj.keys())[:20]
+                # Buscar cualquier clave que contenga "segment" o "profile"
+                def find_keys(o, prefix="", depth=0):
+                    if depth > 4 or not isinstance(o, dict):
+                        return []
+                    keys = []
+                    for k, v in o.items():
+                        full = f"{prefix}.{k}" if prefix else k
+                        if any(x in k.lower() for x in ("segment", "profile", "playlist", "tier", "rating")):
+                            keys.append(f"{full} ({type(v).__name__})")
+                        keys += find_keys(v, full, depth + 1)
+                    return keys
+                result["initial_state_interesting_keys"] = find_keys(obj)[:30]
+            except Exception as e:
+                result["initial_state_parse_error"] = str(e)
+                result["initial_state_raw_sample"] = raw[:300]
+        else:
+            result["initial_state_extracted"] = "No se pudo extraer con balance de llaves"
+            # Mostrar fragmento del HTML alrededor de __INITIAL_STATE__
+            idx = html.find("__INITIAL_STATE__")
+            if idx != -1:
+                result["initial_state_html_snippet"] = html[idx:idx+200]
+
+        # Scripts inline que contienen "segments"
+        scripts_with_segments = []
+        for i, s in enumerate(re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)):
+            if '"segments"' in s:
+                scripts_with_segments.append({"script_index": i, "length": len(s), "snippet": s[:150]})
+        result["scripts_with_segments"] = scripts_with_segments[:5]
+
         data = _scrape(PLAYER_NAME)
-        result["scrape_status"] = "OK — datos encontrados" if data else "FAIL — sin datos en HTML (estructura cambiada)"
+        result["scrape_status"] = "OK — datos encontrados" if data else "FAIL — sin datos en HTML"
     except Exception as e:
         result["scrape_status"] = f"Error: {type(e).__name__}: {e}"
 
