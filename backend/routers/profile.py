@@ -209,13 +209,33 @@ def _scrape(username):
         except Exception as e:
             logger.debug(f"__NEXT_DATA__ error: {e}")
 
-    # ── Intento 2: window.__INITIAL_STATE__ (extractor con balance de llaves) ─
+    # ── Intento 2: window.__INITIAL_STATE__ ─────────────────────────────────
+    # Estructura conocida de tracker.gg: { stats: { segments: [...], standardProfiles: [...] } }
     raw = _extract_json_at(html, "window.__INITIAL_STATE__")
     if raw:
         try:
-            found = _find_segments(json.loads(raw))
+            obj = json.loads(raw)
+            stats = obj.get("stats", {})
+            segments = stats.get("segments") or []
+
+            if segments:
+                # Extraer platformInfo desde standardProfiles
+                profiles = stats.get("standardProfiles") or []
+                pi = {}
+                if profiles and isinstance(profiles[0], dict):
+                    p = profiles[0]
+                    pi = {
+                        "platformUserHandle": p.get("platformUserHandle") or p.get("platformUserIdentifier") or p.get("handle"),
+                        "avatarUrl":          p.get("avatarUrl"),
+                        "platformSlug":       p.get("platformSlug") or TRACKER_PLATFORM,
+                    }
+                logger.info(f"Datos en __INITIAL_STATE__.stats.segments ({len(segments)} segmentos)")
+                return _parse({"data": {"segments": segments, "platformInfo": pi, "metadata": {}}})
+
+            # Fallback: buscar segments en cualquier parte del objeto
+            found = _find_segments(obj)
             if found:
-                logger.info("Datos en __INITIAL_STATE__")
+                logger.info("Datos en __INITIAL_STATE__ (búsqueda recursiva)")
                 return _parse({"data": found})
         except Exception as e:
             logger.debug(f"__INITIAL_STATE__ parse error: {e}")
