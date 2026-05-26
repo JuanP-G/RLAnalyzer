@@ -51,9 +51,9 @@ _PROFILE_FILE = os.path.join(_DATA_DIR, "profile_cache.json")
 _HISTORY_FILE = os.path.join(_DATA_DIR, "history_cache.json")
 os.makedirs(_DATA_DIR, exist_ok=True)
 
-_mem_profile  = {"data": None, "ts": 0}
-_mem_history  = {"data": None, "ts": 0}
-_blocked_until = 0  # timestamp hasta el que no reintentamos si tracker.gg nos bloqueó
+_mem_profile      = {"data": None, "ts": 0}
+_mem_history      = {"data": None, "ts": 0}
+_api_blocked_until = 0  # bloquea solo la API (403/429); el scraping sigue disponible
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -194,43 +194,47 @@ def _scrape(username):
 
 def _fetch_fresh(username):
     """Intenta obtener datos frescos. Devuelve (data, error_msg)."""
-    global _blocked_until
+    global _api_blocked_until
     now = time.time()
+    errors = []
 
-    # Si tracker.gg nos bloqueó recientemente, ni lo intentamos
-    if now < _blocked_until:
-        mins = int((_blocked_until - now) / 60) + 1
-        return None, f"tracker.gg bloqueado temporalmente — reintentando en ~{mins} min"
-
-    # 1. API
-    try:
-        url = (
-            f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
-            f"/{TRACKER_PLATFORM}/{quote(username)}"
-        )
-        data = _parse(_get_json(url))
-        logger.info("Perfil obtenido de API")
-        _blocked_until = 0  # Éxito — resetear bloqueo
-        return data, None
-    except HTTPError as e:
-        logger.info(f"API HTTP {e.code}")
-        if e.code in (403, 429):
-            _blocked_until = now + BLOCKED_TTL
-            logger.warning(f"tracker.gg devolvió {e.code} — esperando {BLOCKED_TTL//60} min antes de reintentar")
-    except Exception as e:
-        logger.info(f"API error: {e}")
-
-    # 2. Web scraping (solo si no estamos bloqueados por IP)
-    if now >= _blocked_until:
+    # 1. API (se salta si fue bloqueada por 403/429, pero el scraping siempre corre)
+    if now >= _api_blocked_until:
         try:
-            data = _scrape(username)
-            if data:
-                logger.info("Perfil obtenido por scraping")
-                return data, None
+            url = (
+                f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
+                f"/{TRACKER_PLATFORM}/{quote(username)}"
+            )
+            data = _parse(_get_json(url))
+            logger.info("Perfil obtenido de API")
+            _api_blocked_until = 0  # Éxito — resetear bloqueo
+            return data, None
+        except HTTPError as e:
+            logger.info(f"API HTTP {e.code}")
+            errors.append(f"API HTTP {e.code}")
+            if e.code in (403, 429):
+                _api_blocked_until = now + BLOCKED_TTL
+                logger.warning(f"tracker.gg API devolvió {e.code} — no reintentando API por {BLOCKED_TTL//60} min")
         except Exception as e:
-            logger.warning(f"Scraping error: {e}")
+            logger.info(f"API error: {e}")
+            errors.append(f"API: {e}")
+    else:
+        mins = int((_api_blocked_until - now) / 60) + 1
+        logger.info(f"API bloqueada, saltando (reintenta en ~{mins} min)")
+        errors.append(f"API bloqueada (~{mins} min)")
 
-    return None, "tracker.gg no disponible (API bloqueada y scraping sin datos)"
+    # 2. Web scraping — siempre se intenta independientemente del bloqueo de la API
+    try:
+        data = _scrape(username)
+        if data:
+            logger.info("Perfil obtenido por scraping")
+            return data, None
+        errors.append("Scraping: sin datos en HTML")
+    except Exception as e:
+        logger.warning(f"Scraping error: {e}")
+        errors.append(f"Scraping: {e}")
+
+    return None, " | ".join(errors) or "tracker.gg no disponible"
 
 
 # ---- Endpoints -------------------------------------------------------------
@@ -327,9 +331,10 @@ def debug_profile_stats():
 @router.post("/profile/invalidate")
 def invalidate_profile():
     """Borra cache en memoria y en disco para forzar refresco completo."""
-    global _mem_profile, _mem_history
+    global _mem_profile, _mem_history, _api_blocked_until
     _mem_profile = {"data": None, "ts": 0}
     _mem_history = {"data": None, "ts": 0}
+    _api_blocked_until = 0  # permite reintentar la API inmediatamente
     for f in [_PROFILE_FILE, _HISTORY_FILE]:
         try:
             os.remove(f)
