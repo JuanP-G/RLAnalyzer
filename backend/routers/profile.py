@@ -240,7 +240,7 @@ def _scrape(username):
         except Exception as e:
             logger.debug(f"__INITIAL_STATE__ parse error: {e}")
 
-    # ── Intento 3: cualquier script inline que contenga "segments" ────────────
+    # ── Intento 3: cualquier script inline que contenga "segments" ──────────── # noqa
     for script_content in re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL):
         if '"segments"' not in script_content:
             continue
@@ -265,8 +265,85 @@ def _scrape(username):
             except Exception:
                 pass
 
-    logger.warning("Scraping: sin datos de perfil en el HTML (estructura no reconocida)")
+    logger.warning("Scraping HTTP: sin datos de perfil en el HTML (estructura no reconocida)")
     return None
+
+
+def _scrape_headless(username: str):
+    """
+    Fallback con Chromium headless (Playwright).
+    Navega la página real y captura la llamada que el sitio hace a api.tracker.gg,
+    que sí incluye las cookies de sesión necesarias para obtener datos.
+
+    Requiere instalación previa:
+        pip install playwright
+        python -m playwright install chromium
+    """
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        logger.info("Playwright no instalado — headless scraping no disponible")
+        return None
+
+    url = (
+        f"https://rocketleague.tracker.network/rocket-league/profile"
+        f"/{TRACKER_PLATFORM}/{quote(username)}/overview"
+    )
+    logger.info(f"Playwright headless: {url}")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=_UA,
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
+
+            # Bloquear imágenes/fuentes/vídeos para acelerar carga
+            page.route(
+                "**/*.{png,jpg,jpeg,gif,svg,woff,woff2,ttf,ico,mp4,webp}",
+                lambda r: r.abort(),
+            )
+
+            captured = []
+
+            def on_response(response):
+                if (
+                    "api.tracker.gg" in response.url
+                    and "rocket-league" in response.url
+                    and response.status == 200
+                ):
+                    try:
+                        data = response.json()
+                        segs = (data.get("data") or {}).get("segments") or []
+                        if segs:
+                            captured.append(data)
+                            logger.info(
+                                f"Playwright: capturada API con {len(segs)} segmentos"
+                            )
+                    except Exception:
+                        pass
+
+            page.on("response", on_response)
+
+            try:
+                page.goto(url, wait_until="networkidle", timeout=30000)
+            except PWTimeout:
+                logger.warning("Playwright: networkidle timeout — usando datos capturados")
+
+            browser.close()
+
+        if captured:
+            logger.info("Playwright: perfil obtenido correctamente")
+            return _parse(captured[0])
+
+        logger.warning("Playwright: sin respuestas API capturadas")
+        return None
+
+    except Exception as e:
+        logger.warning(f"Playwright error: {e}")
+        return None
 
 
 # ---- Intento de obtener datos frescos de tracker.gg ------------------------
@@ -307,16 +384,28 @@ def _fetch_fresh(username):
         logger.info(f"API bloqueada, saltando (reintenta en ~{mins} min)")
         errors.append(f"API bloqueada (~{mins} min)")
 
-    # 2. Web scraping — siempre se intenta independientemente del bloqueo de la API
+    # 2. Web scraping HTTP — rápido, falla si el sitio carga datos via JS
     try:
         data = _scrape(username)
         if data:
-            logger.info("Perfil obtenido por scraping")
+            logger.info("Perfil obtenido por scraping HTTP")
             return data, None
-        errors.append("Scraping: sin datos en HTML")
+        errors.append("Scraping HTTP: sin datos en HTML")
     except Exception as e:
-        logger.warning(f"Scraping error: {e}")
-        errors.append(f"Scraping: {e}")
+        logger.warning(f"Scraping HTTP error: {e}")
+        errors.append(f"Scraping HTTP: {e}")
+
+    # 3. Playwright headless — navega con Chromium real, captura la API del sitio
+    try:
+        data = _scrape_headless(username)
+        if data:
+            logger.info("Perfil obtenido por Playwright headless")
+            _disk_save(_PROFILE_FILE, data)  # cachear en disco para próximas cargas
+            return data, None
+        errors.append("Playwright: sin datos (¿no instalado?)")
+    except Exception as e:
+        logger.warning(f"Playwright error en fetch: {e}")
+        errors.append(f"Playwright: {e}")
 
     return None, " | ".join(errors) or "tracker.gg no disponible"
 

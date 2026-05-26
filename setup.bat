@@ -54,9 +54,23 @@ if %errorlevel% neq 0 (
     pause & exit /b 1
 )
 
-:: ── 4. Dependencias frontend + Electron ──────────────────────────────────────
+:: ── 4. Playwright (navegador headless para perfil tracker.gg) ────────────────
 echo.
-echo [4/5] Instalando dependencias frontend y Electron...
+echo [4/6] Instalando Playwright y Chromium ^(perfil tracker.gg^)...
+echo  ^(puede tardar 1-2 minutos la primera vez — descarga ~130MB^)
+pip install playwright >nul 2>&1
+python -m playwright install chromium
+if %errorlevel% neq 0 (
+    echo  AVISO: No se pudo instalar Chromium para Playwright.
+    echo  El perfil tracker.gg no estara disponible hasta instalar manualmente:
+    echo    pip install playwright
+    echo    python -m playwright install chromium
+    echo  El resto de la app funciona con normalidad.
+)
+
+:: ── 5. Dependencias frontend + Electron ──────────────────────────────────────
+echo.
+echo [5/6] Instalando dependencias frontend y Electron...
 
 cd /d "%~dp0frontend"
 call npm install
@@ -66,9 +80,9 @@ cd /d "%~dp0electron"
 call npm install
 if %errorlevel% neq 0 ( echo  ERROR en npm install electron. & pause & exit /b 1 )
 
-:: ── 5. Acceso directo en escritorio ──────────────────────────────────────────
+:: ── 6. Acceso directo en escritorio ──────────────────────────────────────────
 echo.
-echo [5/5] Creando acceso directo en el escritorio...
+echo [6/6] Creando acceso directo en el escritorio...
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ws = New-Object -ComObject WScript.Shell; " ^
