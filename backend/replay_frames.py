@@ -358,20 +358,37 @@ def _parse_rrrocket(data: dict) -> dict:
                 rot = a.get("_init_rot")
             if not loc or not isinstance(loc, dict):
                 continue
-            yaw = 0.0
+            qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
             if rot and isinstance(rot, dict):
                 if "w" in rot:
-                    yaw = _quat_to_yaw(rot)
+                    qx = float(rot.get("x", 0) or 0)
+                    qy = float(rot.get("y", 0) or 0)
+                    qz = float(rot.get("z", 0) or 0)
+                    qw = float(rot.get("w", 1) or 1)
+                    n  = math.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
+                    if n > 0:
+                        qx, qy, qz, qw = qx/n, qy/n, qz/n, qw/n
                 else:
-                    raw = rot.get("yaw", 0) or 0
-                    yaw = (raw / 32767.0) * math.pi
+                    raw_y = rot.get("yaw",   0) or 0
+                    raw_p = rot.get("pitch", 0) or 0
+                    raw_r = rot.get("roll",  0) or 0
+                    yaw   = (raw_y / 32767.0) * math.pi
+                    pitch = (raw_p / 32767.0) * math.pi
+                    roll  = (raw_r / 32767.0) * math.pi
+                    cy, sy = math.cos(yaw/2),   math.sin(yaw/2)
+                    cp, sp = math.cos(pitch/2), math.sin(pitch/2)
+                    cr, sr = math.cos(roll/2),  math.sin(roll/2)
+                    qw = cr*cp*cy + sr*sp*sy
+                    qx = sr*cp*cy - cr*sp*sy
+                    qy = cr*sp*cy + sr*cp*sy
+                    qz = cr*cp*sy - sr*sp*cy
             car_frames.append([
                 round(t, 3),
                 player_idx,
                 round(loc.get("x", 0), 1),
                 round(loc.get("y", 0), 1),
                 round(loc.get("z", 0), 1),
-                round(yaw, 4),
+                round(qx, 5), round(qy, 5), round(qz, 5), round(qw, 5),
             ])
 
     # ── Limpiar slots de jugadores duplicados (de respawns) ───────────────────
@@ -380,8 +397,8 @@ def _parse_rrrocket(data: dict) -> dict:
         idx_remap   = {old: new for new, old in enumerate(used_indices)}
         players_out = [players_out[i] for i in used_indices]
         car_frames  = [
-            [t, idx_remap[idx], x, y, z, yaw]
-            for t, idx, x, y, z, yaw in car_frames
+            [t, idx_remap[idx], x, y, z, qx, qy, qz, qw]
+            for t, idx, x, y, z, qx, qy, qz, qw in car_frames
             if idx in idx_remap
         ]
 
@@ -391,6 +408,7 @@ def _parse_rrrocket(data: dict) -> dict:
     )
 
     return {
+        "format":    2,
         "duration":  round(duration, 2),
         "players":   players_out,
         "goals":     goals_out,
@@ -411,7 +429,7 @@ def get_frames_cached(replay_id: int, replay_path: str) -> dict:
         with open(cache_path, encoding="utf-8") as f:
             cached = json.load(f)
         # Validar que la caché no es de una extracción rota (sin -n flag)
-        if cached.get("duration", 0) > 0 and cached.get("ball"):
+        if cached.get("format", 1) >= 2 and cached.get("duration", 0) > 0 and cached.get("ball"):
             logger.info(f"Frames desde caché: {cache_path}")
             return cached
         logger.warning(f"Caché inválida (duration=0 o sin ball frames), re-extrayendo…")
