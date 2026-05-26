@@ -144,7 +144,6 @@ export default function ReplayList() {
     if (rows !== limitRef.current) {
       limitRef.current = rows
       setLimit(rows)
-      setSearchParams(p => { const n = new URLSearchParams(p); n.delete('page'); return n }, { replace: true })
     }
   }, [])
 

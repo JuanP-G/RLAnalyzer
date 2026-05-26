@@ -123,6 +123,7 @@ function ReplayRow({ replay, playerName }) {
 
 export default function PlayerHistory() {
   const { name }                  = useParams()
+  const navigate                  = useNavigate()
   const decodedName               = decodeURIComponent(name)
   const [summary, setSummary]     = useState(null)
   const [replays, setReplays]     = useState([])

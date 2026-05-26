@@ -369,12 +369,13 @@ export default function ReplayDetail() {
 
       {/* Header */}
       <div className="animate-fade-up">
-        <Link
-          to="/replays"
+        <button
+          onClick={() => navigate(-1)}
           className="text-rl-blue text-sm hover:underline transition-opacity hover:opacity-80"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         >
           ← Volver a partidas
-        </Link>
+        </button>
         <div className="mt-4 flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h1 className="font-display font-bold text-gray-100 capitalize" style={{ fontSize: '1.6rem', letterSpacing: '0.03em' }}>

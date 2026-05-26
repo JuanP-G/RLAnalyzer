@@ -40,7 +40,7 @@ const links = [
 export default function Sidebar({ playerName, folderOk }) {
   return (
     <aside
-      className="w-56 h-screen flex-shrink-0 flex flex-col"
+      className="w-56 h-full flex-shrink-0 flex flex-col"
       style={{
         background: 'linear-gradient(180deg, #081A30 0%, #04101E 100%)',
         borderRight: '1px solid #122A4D',
