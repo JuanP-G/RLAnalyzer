@@ -29,7 +29,8 @@ def _load_api_key():
     if key:
         return key
     # Fallback: leer .env directamente (por si el proceso no cargó las vars de entorno)
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", ".env")
+    # __file__ = backend/routers/profile.py → dirname×2 = backend/ → .env = backend/.env
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if not os.path.exists(env_path):
         env_path = os.path.join(os.path.dirname(__file__), ".env")
     try:
@@ -326,6 +327,73 @@ def debug_profile_stats():
             "rating_raw":       stats.get("rating", {}).get("value"),
         })
     return {"playlists": results}
+
+
+@router.get("/profile/diagnose")
+def diagnose_profile():
+    """
+    Diagnóstico completo del sistema de perfil.
+    Hace llamadas reales a tracker.gg y muestra el error exacto sin afectar la caché.
+    Llama a http://localhost:8000/api/profile/diagnose para ver qué está fallando.
+    """
+    import socket
+    result = {
+        "api_key_loaded":     bool(TRACKER_API_KEY),
+        "api_key_prefix":     TRACKER_API_KEY[:6] + "..." if TRACKER_API_KEY else "(ninguna)",
+        "player_name":        PLAYER_NAME,
+        "platform":           TRACKER_PLATFORM,
+        "api_blocked_until":  _api_blocked_until,
+        "api_blocked_active": time.time() < _api_blocked_until,
+        "disk_cache_exists":  os.path.exists(_PROFILE_FILE),
+        "disk_cache_bytes":   os.path.getsize(_PROFILE_FILE) if os.path.exists(_PROFILE_FILE) else 0,
+    }
+
+    # Test de conectividad básica
+    try:
+        socket.setdefaulttimeout(5)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("api.tracker.gg", 443))
+        result["internet_ok"] = True
+    except Exception as e:
+        result["internet_ok"] = False
+        result["internet_error"] = str(e)
+
+    # Test API directo — muestra el error HTTP exacto
+    api_url = (
+        f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
+        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}"
+    )
+    result["api_url"] = api_url
+    try:
+        data = _get_json(api_url)
+        result["api_status"] = "OK"
+        result["api_segments"] = len(data.get("data", {}).get("segments", []))
+    except HTTPError as e:
+        result["api_status"] = f"HTTP {e.code} {e.reason}"
+        try:
+            body = e.read().decode("utf-8", errors="replace")[:400]
+            result["api_error_body"] = body
+        except Exception:
+            pass
+    except Exception as e:
+        result["api_status"] = f"Error: {type(e).__name__}: {e}"
+
+    # Test scraping — muestra cuántos bytes obtuvo y si encontró los datos
+    scrape_url = (
+        f"https://rocketleague.tracker.network/rocket-league/profile"
+        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}/overview"
+    )
+    result["scrape_url"] = scrape_url
+    try:
+        html = _get_html(scrape_url)
+        result["scrape_bytes"] = len(html)
+        result["scrape_has_next_data"] = "__NEXT_DATA__" in html
+        result["scrape_has_initial_state"] = "__INITIAL_STATE__" in html
+        data = _scrape(PLAYER_NAME)
+        result["scrape_status"] = "OK — datos encontrados" if data else "FAIL — sin datos en HTML (estructura cambiada)"
+    except Exception as e:
+        result["scrape_status"] = f"Error: {type(e).__name__}: {e}"
+
+    return result
 
 
 @router.post("/profile/invalidate")
