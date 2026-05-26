@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { getMapName } from '../utils/mapNames'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -100,7 +101,7 @@ function ReplayRow({ replay, playerName }) {
         {myScore}–{oppScore}
       </span>
 
-      <span className="text-gray-400 text-xs flex-1">{replay.map_name || '—'}</span>
+      <span className="text-gray-400 text-xs flex-1">{getMapName(replay.map_name)}</span>
       <span className="text-gray-500 text-xs">{formatDate(replay.played_at)}</span>
 
       {replay.my_stats && (

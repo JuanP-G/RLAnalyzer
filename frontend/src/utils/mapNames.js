@@ -35,6 +35,7 @@ const MAP_NAMES = {
   'utopiastadium_p':         'Utopia Coliseum',
   'utopiastadium_dusk_p':    'Utopia Coliseum (Atardecer)',
   'utopiastadium_snow_p':    'Utopia Coliseum (Nevada)',
+  'utopiastadium_lux_p':     'Utopia Coliseum (Lux)',
   'labs_utopia_p':           'Utopia Retro',
   // Nombres alternativos (replays antiguos)
   'uf_p':                    'Utopia Coliseum',

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { getMapName } from '../utils/mapNames'
 
@@ -68,23 +68,60 @@ function FilterChip({ label, active, onClick, color }) {
 }
 
 export default function ReplayList() {
-  const [replays,    setReplays]    = useState([])
-  const [total,      setTotal]      = useState(0)
-  const [loading,    setLoading]    = useState(true)
-  const [page,       setPage]       = useState(0)
-  const [limit,      setLimit]      = useState(15)
-  const [favOnly,         setFavOnly]         = useState(false)
-  const [filterResult,    setFilterResult]    = useState(null)   // null | 'win' | 'loss'
-  const [filterTeamSize,  setFilterTeamSize]  = useState(null)   // null | 1 | 2 | 3
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Estado persistido en URL para que el botón atrás restaure posición y filtros
+  const page           = parseInt(searchParams.get('page') || '0')
+  const filterResult   = searchParams.get('result')   || null
+  const filterTeamSize = searchParams.get('size') ? parseInt(searchParams.get('size')) : null
+  const favOnly        = searchParams.get('fav') === '1'
+
+  const setPage = useCallback((val) => {
+    setSearchParams(p => {
+      const next = new URLSearchParams(p)
+      const v = typeof val === 'function' ? val(parseInt(p.get('page') || '0')) : val
+      v === 0 ? next.delete('page') : next.set('page', String(v))
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setFilterResult = useCallback((val) => {
+    setSearchParams(p => {
+      const next = new URLSearchParams(p)
+      next.delete('page')
+      val ? next.set('result', val) : next.delete('result')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setFilterTeamSize = useCallback((val) => {
+    setSearchParams(p => {
+      const next = new URLSearchParams(p)
+      next.delete('page')
+      val ? next.set('size', String(val)) : next.delete('size')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setFavOnly = useCallback((val) => {
+    setSearchParams(p => {
+      const next = new URLSearchParams(p)
+      next.delete('page')
+      val ? next.set('fav', '1') : next.delete('fav')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const [replays, setReplays] = useState([])
+  const [total,   setTotal]   = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [limit,   setLimit]   = useState(15)
 
   const hasFilters = favOnly || filterResult || filterTeamSize
 
   const clearFilters = useCallback(() => {
-    setFavOnly(false)
-    setFilterResult(null)
-    setFilterTeamSize(null)
-    setPage(0)
-  }, [])
+    setSearchParams({}, { replace: true })
+  }, [setSearchParams])
 
   // Refs para medir el espacio disponible real en el DOM
   const tableBoxRef = useRef(null)  // div que envuelve toda la tabla (flex-1)
@@ -107,7 +144,7 @@ export default function ReplayList() {
     if (rows !== limitRef.current) {
       limitRef.current = rows
       setLimit(rows)
-      setPage(0)
+      setSearchParams(p => { const n = new URLSearchParams(p); n.delete('page'); return n }, { replace: true })
     }
   }, [])
 
@@ -128,9 +165,6 @@ export default function ReplayList() {
   useLayoutEffect(() => {
     if (replays.length > 0) recalc()
   }, [replays, recalc])
-
-  // Reset página al cambiar filtros
-  const resetPage = useCallback(() => setPage(0), [])
 
   // Carga de datos
   useEffect(() => {
