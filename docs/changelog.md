@@ -5,7 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
-## [Unreleased] — 2026-05-26
+## [Unreleased] — 2026-05-26 (actualizado)
 
 ### Añadido
 - **Visor 3D interactivo** (`frontend/src/pages/ReplayViewer.jsx`)
@@ -32,15 +32,22 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 - **Detalle de replay mejorado**: SpeedInfoPanel, comparativa vs media histórica
 - **Endpoints de diagnóstico**: `/api/replays/{id}/frames/debug`, `/api/replays/debug/viewer-check`, `/api/profile/debug-stats`
 
+### Añadido (post-release)
+- **Playwright headless** como fallback para perfil tracker.gg. tracker.gg carga los datos via JS client-side; el scraping HTTP obtiene el store de Vuex vacío. Playwright navega con Chromium real e intercepta la respuesta API del sitio (con sus cookies de sesión). Instalado automáticamente por `setup.bat`. Primera carga ~15s, siguientes desde caché disco.
+- **`GET /api/profile/diagnose`** — endpoint de diagnóstico del sistema de perfil
+
 ### Corregido
 - **Bug crítico — 21 jugadores en 2v2**: La deduplicación de coches usaba `PlayerReplicationInfo` (atributo inexistente en rrrocket 0.11+). Corregido usando `ActiveActor.actor` como link car→PRI y `UniqueId` para deduplicar respawns.
 - **Filtros de lista ignorados**: `match_type` y `game_category` enviados por el frontend eran silenciosamente ignorados porque no estaban declarados como params del endpoint.
 - **Campos faltantes en API**: `game_category` y `playlist_id` existían en el modelo pero no se incluían en `replay_to_dict()`.
 - **Docstring incorrecto**: El módulo `replay_frames.py` documentaba 8 campos por entrada de `cars` cuando son 6.
+- **Scraping bloqueaba Playwright**: `_blocked_until` impedía el scraping cuando la API devolvía 403. Renombrado a `_api_blocked_until`; Playwright siempre se intenta independientemente.
+- **Path de `.env` incorrecto** en `_load_api_key()`: construía `backend/backend/.env` en lugar de `backend/.env`.
+- **403 "not approved" activaba bloqueo de 30 min**: solo el 429 (rate limit) debería activarlo. Un 403 de key no aprobada se reintenta en cada request.
 
 ### Documentación
-- `README.md` actualizado con sección de Visor 3D, estructura de archivos completa y tabla de stack
-- `docs/architecture.md` — arquitectura técnica completa
+- `README.md` actualizado con sección de Visor 3D, estructura de archivos completa, tabla de stack y capa Playwright
+- `docs/architecture.md` — arquitectura técnica completa, incluyendo la cadena de fallback de perfil actualizada
 - `docs/api-reference.md` — referencia completa de la API REST
 - `docs/testing.md` — pruebas manuales ejecutadas y plan de pruebas futuras
 - `docs/changelog.md` — este archivo

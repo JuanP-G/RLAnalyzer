@@ -28,6 +28,8 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 | Rust (cargo) | estable | https://rustup.rs |
 
 > Rust solo es necesario para compilar `subtr-actor-py` la primera vez. Si ya está instalado en tu sistema, el setup lo detecta automáticamente.
+>
+> `setup.bat` instala también **Playwright + Chromium** (~130 MB) para el perfil tracker.gg. Si la descarga falla, el resto de la app funciona con normalidad.
 
 ---
 
@@ -58,6 +60,7 @@ setup.bat
 Esto instala automáticamente:
 - Dependencias Python (FastAPI, SQLAlchemy, etc.)
 - `subtr-actor-py` compilado desde fuente (puede tardar 5-10 min la primera vez)
+- **Playwright + Chromium** para el perfil tracker.gg (puede tardar 1-2 min)
 - Dependencias npm del frontend
 - Electron (wrapper de escritorio)
 - Crea un acceso directo en tu escritorio
@@ -81,15 +84,24 @@ La app arranca el backend y el frontend automáticamente y los cierra al cerrar 
 
 ## Perfil y tracker.gg
 
-El perfil muestra rangos, MMR e historial desde [tracker.gg](https://rocketleague.tracker.network). Sin API key, la app intenta scraping de la web como fallback. Cuando tengas tu key de [tracker.gg/developers](https://tracker.gg/developers):
+El perfil muestra rangos, MMR e historial desde [tracker.gg](https://rocketleague.tracker.network).
 
-1. Edita `backend/.env`:
-   ```
-   TRACKER_API_KEY=tu-api-key-aqui
-   ```
-2. Reinicia el backend
+La app intenta obtener los datos en este orden:
 
-Los datos se cachean en disco (sin expirar) para funcionar offline con los últimos datos conocidos.
+1. **API tracker.gg** — si tienes API key y está aprobada
+2. **Scraping HTTP** — intento rápido sin navegador
+3. **Playwright headless** — Chromium real que carga la página completa (~15s, instala automáticamente con `setup.bat`)
+4. **Caché en disco** — último dato guardado, funciona sin conexión
+
+**API key (opcional):** cuando tracker.gg apruebe tu key de [tracker.gg/developers](https://tracker.gg/developers):
+```
+# backend/.env
+TRACKER_API_KEY=tu-api-key-aqui
+```
+
+> Sin API key aprobada la app usa Playwright como fallback automático. Los datos se cachean en disco para uso offline.
+
+> **Nota:** Las API keys de tracker.gg requieren aprobación manual. Contacta con ellos en su Discord si la key devuelve 403.
 
 ---
 

@@ -219,14 +219,32 @@ Los frames extraídos se guardan en `data/frames/<replay_id>.json` (JSON compact
 Estrategia de datos en capas:
 
 ```
-1. Memoria (< 10 min)       → respuesta inmediata
-2. API tracker.gg           → datos frescos con TRN-Api-Key o sin key
-3. Web scraping fallback    → extrae __NEXT_DATA__ del HTML
-4. Caché en disco           → offline-first (sin TTL)
-5. Error 503                → si no hay datos en ninguna capa
+1. Memoria en proceso (< 10 min)   → respuesta inmediata
+2. API tracker.gg                  → TRN-Api-Key aprobada → datos en ~1s
+3. Scraping HTTP                   → extrae __INITIAL_STATE__ del HTML
+                                     (falla: tracker.gg carga datos via JS)
+4. Playwright headless             → Chromium real, captura la API call del
+                                     sitio con cookies de sesión → ~15s
+5. Caché en disco                  → offline-first (sin TTL)
+6. Error 503                       → si no hay datos en ninguna capa
 ```
 
-Si tracker.gg devuelve 403 o 429, se activa un bloqueo de 30 minutos antes de volver a intentarlo.
+**Comportamiento de bloqueo:**
+- HTTP 429 (rate limit) → bloquea reintentos de la API durante 30 min
+- HTTP 403 "not approved" → no bloquea; se reintenta en cada request y siempre cae a Playwright
+- `POST /api/profile/invalidate` → resetea todo incluyendo el bloqueo
+
+**Por qué falla el scraping HTTP:**
+tracker.gg es una SPA Vue.js. El HTML inicial tiene `window.__INITIAL_STATE__` con el store de Vuex vacío (`stats.segments: []`). Los datos reales se cargan client-side vía llamadas a `api.tracker.gg` que incluyen cookies de sesión. Sin un navegador real que ejecute el JS y maneje las cookies, el scraping HTTP no puede obtener los datos.
+
+**Playwright:** lanza Chromium headless, navega la página, intercepta la respuesta de `api.tracker.gg` que el propio sitio hace (con sus cookies), y la parsea con `_parse()`. Los datos obtenidos se cachean en disco automáticamente.
+
+**Dependencia Playwright:**
+```bash
+pip install playwright
+python -m playwright install chromium   # ~130 MB, instalado por setup.bat
+```
+Si no está instalado, la capa 4 se salta silenciosamente y se pasa a la caché en disco.
 
 ---
 
