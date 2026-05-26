@@ -7,6 +7,7 @@ import ReplayList from './pages/ReplayList'
 import ReplayDetail from './pages/ReplayDetail'
 import ReplayViewer from './pages/ReplayViewer'
 import Profile from './pages/Profile'
+import PlayerHistory from './pages/PlayerHistory'
 import { api } from './api'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/replays/:id"   element={<ReplayDetail />} />
           <Route path="/replays/:id/viewer" element={<ReplayViewer />} />
             <Route path="/profile"        element={<Profile />} />
+            <Route path="/players/:name"  element={<PlayerHistory />} />
           </Routes>
         </main>
       </div>

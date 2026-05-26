@@ -523,12 +523,20 @@ export default function ReplayDetail() {
                         ${i === players.length - 1 ? 'border-b-0' : ''}`}
                     >
                       <td className="px-3 py-3">
-                        <span className={`font-medium ${p.is_me ? 'text-rl-blue' : 'text-gray-200'}`}>
-                          {p.player_name}
-                          {p.is_me && (
+                        {p.is_me ? (
+                          <span className="font-medium text-rl-blue">
+                            {p.player_name}
                             <span className="ml-2 text-xs bg-rl-blue/20 text-rl-blue px-1.5 py-0.5 rounded">tú</span>
-                          )}
-                        </span>
+                          </span>
+                        ) : (
+                          <Link
+                            to={`/players/${encodeURIComponent(p.player_name)}`}
+                            className="font-medium text-gray-200 hover:text-rl-blue transition-colors"
+                            title={`Ver historial con ${p.player_name}`}
+                          >
+                            {p.player_name}
+                          </Link>
+                        )}
                       </td>
                       <StatCell value={p.score}           isMe={p.is_me} />
                       <StatCell value={p.goals}           isMe={p.is_me} />

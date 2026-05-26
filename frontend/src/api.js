@@ -53,4 +53,11 @@ export const api = {
                   }).then(r => { if (!r.ok) throw new Error('Error al actualizar favorito'); return r.json() }),
   profile:        ()                     => cached('profile',        () => fetchJSON(`${BASE}/profile`)),
   profileHistory: ()                     => cached('profileHistory', () => fetchJSON(`${BASE}/profile/history`)),
+  players:        (q = '')               => fetchJSON(`${BASE}/players${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  playerSummary:  (name)                 => fetchJSON(`${BASE}/players/${encodeURIComponent(name)}/summary`),
+  playerReplays:  (name, ctx, skip = 0, limit = 30) => {
+    const p = new URLSearchParams({ skip, limit })
+    if (ctx) p.set('context', ctx)
+    return fetchJSON(`${BASE}/players/${encodeURIComponent(name)}/replays?${p}`)
+  },
 }
