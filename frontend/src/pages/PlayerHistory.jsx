@@ -169,7 +169,7 @@ export default function PlayerHistory() {
     <div className="h-full overflow-y-auto px-8 py-6">
       {/* Cabecera */}
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/replays" className="text-gray-500 hover:text-gray-300 text-sm">← Partidas</Link>
+        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-300 text-sm">← Atrás</button>
         <span className="text-gray-700">/</span>
         <h1 className="font-display font-bold text-gray-100 text-xl uppercase tracking-wider">
           {decodedName}
