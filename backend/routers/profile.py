@@ -124,6 +124,42 @@ def _get_html(url):
 
 # ---- Scraping web (fallback cuando la API bloquea) -------------------------
 
+def _extract_json_at(text: str, marker: str) -> str | None:
+    """
+    Extrae el primer objeto JSON completo que aparece tras `marker` en `text`.
+    Usa balance de llaves en lugar de regex, por lo que funciona con JSON grande/anidado.
+    """
+    idx = text.find(marker)
+    if idx == -1:
+        return None
+    start = text.find('{', idx)
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == '\\' and in_str:
+            escape = True
+            continue
+        if c == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
 def _find_segments(obj, depth=0):
     if depth > 12:
         return None
@@ -159,7 +195,7 @@ def _scrape(username):
 
     logger.info(f"Scraping: {len(html)} bytes")
 
-    # Next.js __NEXT_DATA__
+    # ── Intento 1: Next.js __NEXT_DATA__ (script tag con id) ─────────────────
     m = re.search(
         r'<script[^>]*id=["\']__NEXT_DATA__["\'][^>]*>\s*(\{.*?\})\s*</script>',
         html, re.DOTALL | re.IGNORECASE,
@@ -168,26 +204,48 @@ def _scrape(username):
         try:
             found = _find_segments(json.loads(m.group(1)))
             if found:
-                logger.info("Datos encontrados en __NEXT_DATA__")
+                logger.info("Datos en __NEXT_DATA__")
                 return _parse({"data": found})
         except Exception as e:
             logger.debug(f"__NEXT_DATA__ error: {e}")
 
-    # __INITIAL_STATE__
-    m2 = re.search(
-        r'window\.__INITIAL_STATE__\s*=\s*(\{.+?\})(?:;\s*(?:window|</script))',
-        html, re.DOTALL,
-    )
-    if m2:
+    # ── Intento 2: window.__INITIAL_STATE__ (extractor con balance de llaves) ─
+    raw = _extract_json_at(html, "window.__INITIAL_STATE__")
+    if raw:
         try:
-            found = _find_segments(json.loads(m2.group(1)))
+            found = _find_segments(json.loads(raw))
             if found:
-                logger.info("Datos encontrados en __INITIAL_STATE__")
+                logger.info("Datos en __INITIAL_STATE__")
                 return _parse({"data": found})
         except Exception as e:
-            logger.debug(f"__INITIAL_STATE__ error: {e}")
+            logger.debug(f"__INITIAL_STATE__ parse error: {e}")
 
-    logger.warning("Scraping: sin datos de perfil en el HTML")
+    # ── Intento 3: cualquier script inline que contenga "segments" ────────────
+    for script_content in re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL):
+        if '"segments"' not in script_content:
+            continue
+        for marker in ('window.__TRN_PROFILE__', 'window.__data__', 'var trn=', 'var profile='):
+            raw = _extract_json_at(script_content, marker.split('=')[0])
+            if raw:
+                try:
+                    found = _find_segments(json.loads(raw))
+                    if found:
+                        logger.info(f"Datos en script con marker '{marker}'")
+                        return _parse({"data": found})
+                except Exception:
+                    pass
+        # Último recurso: buscar el primer objeto JSON grande del script
+        raw = _extract_json_at(script_content, '{')
+        if raw and len(raw) > 5000:
+            try:
+                found = _find_segments(json.loads(raw))
+                if found:
+                    logger.info("Datos en script inline (búsqueda amplia)")
+                    return _parse({"data": found})
+            except Exception:
+                pass
+
+    logger.warning("Scraping: sin datos de perfil en el HTML (estructura no reconocida)")
     return None
 
 
@@ -213,9 +271,14 @@ def _fetch_fresh(username):
         except HTTPError as e:
             logger.info(f"API HTTP {e.code}")
             errors.append(f"API HTTP {e.code}")
-            if e.code in (403, 429):
+            if e.code == 429:
+                # Rate limit — esperar antes de reintentar
                 _api_blocked_until = now + BLOCKED_TTL
-                logger.warning(f"tracker.gg API devolvió {e.code} — no reintentando API por {BLOCKED_TTL//60} min")
+                logger.warning(f"Rate limit 429 — no reintentando API por {BLOCKED_TTL//60} min")
+            elif e.code == 403:
+                # 403 puede ser key no aprobada (permanente) o sin key — no bloquear,
+                # solo dejar que el scraping lo intente en cada request
+                logger.warning("API 403 — key no aprobada o sin key, usando scraping como fallback")
         except Exception as e:
             logger.info(f"API error: {e}")
             errors.append(f"API: {e}")
