@@ -21,20 +21,23 @@ router = APIRouter(prefix="/api", tags=["replays"])
 
 def replay_to_dict(r: Replay, include_players: bool = False) -> dict:
     data = {
-        "id":           r.id,
-        "file_name":    r.file_name,
-        "map_name":     r.map_name,
-        "match_type":   r.match_type,
-        "team_size":    r.team_size,
-        "duration_secs":r.duration_secs,
-        "played_at":    r.played_at.isoformat() if r.played_at else None,
-        "result":       r.result,
-        "my_team":      r.my_team,
-        "team0_score":  r.team0_score,
-        "team1_score":  r.team1_score,
+        "id":             r.id,
+        "file_name":      r.file_name,
+        "file_path":      r.file_path,
+        "map_name":       r.map_name,
+        "match_type":     r.match_type,
+        "game_category":  r.game_category,
+        "team_size":      r.team_size,
+        "playlist_id":    r.playlist_id,
+        "duration_secs":  r.duration_secs,
+        "played_at":      r.played_at.isoformat() if r.played_at else None,
+        "result":         r.result,
+        "my_team":        r.my_team,
+        "team0_score":    r.team0_score,
+        "team1_score":    r.team1_score,
         "is_solo_queue":  r.is_solo_queue,
         "is_favorite":    bool(r.is_favorite),
-        "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+        "processed_at":   r.processed_at.isoformat() if r.processed_at else None,
     }
     if include_players:
         data["players"] = [player_to_dict(p) for p in r.players]
@@ -77,6 +80,8 @@ def list_replays(
     result: Optional[str] = None,
     favorite: Optional[int] = None,
     team_size: Optional[int] = None,
+    match_type: Optional[str] = None,
+    game_category: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Lista de replays, más recientes primero."""
@@ -87,6 +92,10 @@ def list_replays(
         q = q.filter(Replay.is_favorite == True)
     if team_size is not None:
         q = q.filter(Replay.team_size == team_size)
+    if match_type:
+        q = q.filter(Replay.match_type == match_type)
+    if game_category:
+        q = q.filter(Replay.game_category == game_category)
     total = q.count()
     replays = q.offset(skip).limit(limit).all()
     return {
@@ -117,6 +126,179 @@ def get_replay(replay_id: int, db: Session = Depends(get_db)):
     if not r:
         raise HTTPException(status_code=404, detail="Replay no encontrado")
     return replay_to_dict(r, include_players=True)
+
+
+@router.get("/replays/{replay_id}/frames/debug")
+def debug_frames(replay_id: int, db: Session = Depends(get_db)):
+    """
+    Inspecciona la estructura JSON real de rrrocket para un replay.
+    Ayuda a diagnosticar por qué no se extraen datos de balón/coches.
+    """
+    import os, subprocess, json
+
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(404, "Replay no encontrado")
+
+    from config import BASE_DIR
+    rrrocket_exe = os.path.join(BASE_DIR, "tools", "rrrocket.exe")
+
+    if not os.path.exists(rrrocket_exe):
+        return {"error": f"rrrocket no encontrado en {rrrocket_exe}"}
+    if not r.file_path or not os.path.exists(r.file_path):
+        return {"error": "Archivo .replay no encontrado"}
+
+    try:
+        res = subprocess.run([rrrocket_exe, "-n", r.file_path], capture_output=True, timeout=60)
+    except Exception as e:
+        return {"error": str(e)}
+
+    if res.returncode != 0:
+        return {"error": f"rrrocket exit {res.returncode}: {res.stderr.decode('utf-8','replace')[:300]}"}
+
+    try:
+        data = json.loads(res.stdout)
+    except Exception as e:
+        return {"error": f"JSON parse: {e}"}
+
+    top_keys = list(data.keys())
+    net = data.get("network_frames") or {}
+    net_keys = list(net.keys()) if isinstance(net, dict) else str(type(net))
+    frames = net.get("frames") or [] if isinstance(net, dict) else []
+    n_frames = len(frames)
+
+    info = {
+        "top_level_keys": top_keys,
+        "network_frames_keys": net_keys,
+        "n_frames": n_frames,
+    }
+
+    if frames and isinstance(frames[0], dict):
+        f0 = frames[0]
+        info["frame0_keys"] = list(f0.keys())
+        info["frame0_time"] = f0.get("time")
+
+        new_a = f0.get("new_actors") or []
+        upd_a = f0.get("updated_actors") or []
+        info["frame0_new_actors_count"]     = len(new_a)
+        info["frame0_updated_actors_count"] = len(upd_a)
+
+        if new_a and isinstance(new_a[0], dict):
+            info["sample_new_actor"]     = new_a[0]
+        if upd_a and isinstance(upd_a[0], dict):
+            info["sample_updated_actor"] = upd_a[0]
+
+        # Buscar primer frame con RigidBody o ball
+        for fi, fr in enumerate(frames[:200]):
+            if not isinstance(fr, dict):
+                continue
+            for upd in (fr.get("updated_actors") or []):
+                if not isinstance(upd, dict):
+                    continue
+                attr = upd.get("attribute") or {}
+                if isinstance(attr, dict) and "RigidBody" in attr:
+                    info["first_rigidbody_frame"] = fi
+                    info["first_rigidbody_example"] = upd
+                    break
+            if "first_rigidbody_frame" in info:
+                break
+
+        # Object names de los new_actors (via objects_list)
+        objects_list = data.get("objects") or []
+        info["objects_list_length"] = len(objects_list)
+        info["objects_list_sample"] = objects_list[:60]
+
+        actor_names_seen = set()
+        for fr in frames[:200]:
+            if not isinstance(fr, dict):
+                continue
+            for a in (fr.get("new_actors") or []):
+                if isinstance(a, dict):
+                    oid = a.get("object_id")
+                    if oid is not None and 0 <= oid < len(objects_list):
+                        actor_names_seen.add(objects_list[oid])
+        info["actor_object_names"] = sorted(actor_names_seen)
+
+        # Qué matchea como ball/car
+        from replay_frames import _is_ball, _is_car
+        info["ball_names"] = [n for n in actor_names_seen if _is_ball(n)]
+        info["car_names"]  = [n for n in actor_names_seen if _is_car(n)]
+
+    # Último frame (para duration)
+    if frames:
+        last = frames[-1]
+        info["last_frame_time"] = last.get("time") if isinstance(last, dict) else None
+
+    return info
+
+
+@router.get("/replays/debug/viewer-check")
+def debug_viewer_check(db: Session = Depends(get_db)):
+    """Diagnóstico del visor 3D: comprueba rrrocket y un replay de muestra."""
+    import os, subprocess
+    import sys
+
+    BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rrrocket_exe = os.path.join(BASE_DIR, "tools", "rrrocket.exe")
+
+    result = {
+        "rrrocket_path":   rrrocket_exe,
+        "rrrocket_exists": os.path.exists(rrrocket_exe),
+        "python":          sys.executable,
+    }
+
+    # Intentar correr rrrocket sin argumentos para ver si funciona
+    if result["rrrocket_exists"]:
+        try:
+            r = subprocess.run(
+                [rrrocket_exe],
+                capture_output=True, timeout=10,
+            )
+            result["rrrocket_exit_code"] = r.returncode
+            result["rrrocket_stderr"]    = r.stderr.decode("utf-8", errors="replace")[:500]
+            result["rrrocket_stdout_len"] = len(r.stdout)
+        except Exception as e:
+            result["rrrocket_error"] = str(e)
+
+    # Tomar el primer replay de la BD
+    sample = db.query(Replay).filter(Replay.file_path != None).first()
+    if sample:
+        result["sample_replay"] = sample.file_path
+        result["sample_exists"] = os.path.exists(sample.file_path)
+
+    return result
+
+
+@router.get("/replays/{replay_id}/frames")
+def get_replay_frames(replay_id: int, db: Session = Depends(get_db)):
+    """
+    Devuelve posiciones frame a frame del balón y coches para el visor 3D.
+    La primera llamada puede tardar ~5-30s (rrrocket + parsing).
+    Las siguientes usan caché en disco.
+    """
+    import os
+
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Replay no encontrado")
+    if not r.file_path:
+        raise HTTPException(status_code=404, detail="Ruta de archivo no disponible")
+    if not os.path.exists(r.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Archivo .replay no encontrado en este equipo. "
+                   "El visor 3D solo funciona en el PC donde están los replays."
+        )
+
+    try:
+        from replay_frames import get_frames_cached
+        frames = get_frames_cached(replay_id, r.file_path)
+        return frames
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Error cargando frames replay {replay_id}:\n{tb}")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n\n{tb}")
 
 
 @router.get("/stats/summary")

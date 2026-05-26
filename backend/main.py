@@ -12,6 +12,16 @@ import os
 # Añadir el directorio backend al path para que los imports funcionen
 sys.path.insert(0, os.path.dirname(__file__))
 
+# Carga las variables de backend/.env (TRACKER_API_KEY, etc.)
+_env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager

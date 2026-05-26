@@ -22,16 +22,38 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["profile"])
 
 TRACKER_PLATFORM = "epic"
-TRACKER_API_KEY  = ""   # pon aqui tu key de tracker.gg/developers
-CACHE_TTL        = 600  # 10 minutos en memoria antes de intentar refrescar
+
+# Lee la key del .env; si no existe, lee directamente del archivo como fallback
+def _load_api_key():
+    key = os.getenv("TRACKER_API_KEY", "")
+    if key:
+        return key
+    # Fallback: leer .env directamente (por si el proceso no cargó las vars de entorno)
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", ".env")
+    if not os.path.exists(env_path):
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+    try:
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("TRACKER_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
+
+TRACKER_API_KEY  = _load_api_key()
+CACHE_TTL        = 600   # 10 min — refresca si hay conexión
+BLOCKED_TTL      = 1800  # 30 min — si tracker.gg devuelve 403/429, no volver a intentar hasta pasado este tiempo
 
 _DATA_DIR     = os.path.join(BASE_DIR, "data")
 _PROFILE_FILE = os.path.join(_DATA_DIR, "profile_cache.json")
 _HISTORY_FILE = os.path.join(_DATA_DIR, "history_cache.json")
 os.makedirs(_DATA_DIR, exist_ok=True)
 
-_mem_profile = {"data": None, "ts": 0}
-_mem_history = {"data": None, "ts": 0}
+_mem_profile  = {"data": None, "ts": 0}
+_mem_history  = {"data": None, "ts": 0}
+_blocked_until = 0  # timestamp hasta el que no reintentamos si tracker.gg nos bloqueó
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -172,6 +194,14 @@ def _scrape(username):
 
 def _fetch_fresh(username):
     """Intenta obtener datos frescos. Devuelve (data, error_msg)."""
+    global _blocked_until
+    now = time.time()
+
+    # Si tracker.gg nos bloqueó recientemente, ni lo intentamos
+    if now < _blocked_until:
+        mins = int((_blocked_until - now) / 60) + 1
+        return None, f"tracker.gg bloqueado temporalmente — reintentando en ~{mins} min"
+
     # 1. API
     try:
         url = (
@@ -180,20 +210,25 @@ def _fetch_fresh(username):
         )
         data = _parse(_get_json(url))
         logger.info("Perfil obtenido de API")
+        _blocked_until = 0  # Éxito — resetear bloqueo
         return data, None
     except HTTPError as e:
         logger.info(f"API HTTP {e.code}")
+        if e.code in (403, 429):
+            _blocked_until = now + BLOCKED_TTL
+            logger.warning(f"tracker.gg devolvió {e.code} — esperando {BLOCKED_TTL//60} min antes de reintentar")
     except Exception as e:
         logger.info(f"API error: {e}")
 
-    # 2. Web scraping
-    try:
-        data = _scrape(username)
-        if data:
-            logger.info("Perfil obtenido por scraping")
-            return data, None
-    except Exception as e:
-        logger.warning(f"Scraping error: {e}")
+    # 2. Web scraping (solo si no estamos bloqueados por IP)
+    if now >= _blocked_until:
+        try:
+            data = _scrape(username)
+            if data:
+                logger.info("Perfil obtenido por scraping")
+                return data, None
+        except Exception as e:
+            logger.warning(f"Scraping error: {e}")
 
     return None, "tracker.gg no disponible (API bloqueada y scraping sin datos)"
 
@@ -230,7 +265,7 @@ def get_profile():
     raise HTTPException(503, detail=(
         f"{err}. "
         "Cuando se conecte, los datos se guardarán automáticamente para uso offline. "
-        "Si tienes API key, ponla en TRACKER_API_KEY en backend/routers/profile.py."
+        "Si tienes API key, ponla en backend/.env como: TRACKER_API_KEY=tu-key"
     ))
 
 

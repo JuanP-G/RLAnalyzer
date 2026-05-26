@@ -1,4 +1,5 @@
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, Menu, ipcMain, dialog } = require('electron')
+const fs = require('fs')
 const { spawn }                      = require('child_process')
 const path                           = require('path')
 const http                           = require('http')
@@ -89,12 +90,18 @@ async function createWindow() {
     icon:            path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     title:           'RLAnalyzer',
     show:            false,
+    frame:           false,   // Quita la barra nativa de Windows
     backgroundColor: '#04101E',
     webPreferences: {
       nodeIntegration:  false,
       contextIsolation: true,
+      preload:          path.join(__dirname, 'preload.js'),
     },
   })
+
+  // Notifica al renderer cuando la ventana cambia de maximizado
+  mainWindow.on('maximize',   () => mainWindow?.webContents.send('window:maximized'))
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:unmaximized'))
 
   // Los links externos se abren en el navegador del sistema
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -169,7 +176,42 @@ async function createWindow() {
   }
 }
 
+// ── IPC: controles de ventana ─────────────────────────────────────────────────
+ipcMain.handle('window:minimize',    () => mainWindow?.minimize())
+ipcMain.handle('window:maximize',    () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize())
+ipcMain.handle('window:close',       () => mainWindow?.close())
+ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)
+
+// ── IPC: gestión de archivos de replay ────────────────────────────────────────
+ipcMain.handle('replay:showInFolder', (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: 'Archivo no encontrado' }
+  shell.showItemInFolder(filePath)
+  return { ok: true }
+})
+
+ipcMain.handle('replay:export', async (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: 'Archivo no encontrado' }
+
+  const fileName = path.basename(filePath)
+  const { canceled, filePath: dest } = await dialog.showSaveDialog(mainWindow, {
+    title:       'Exportar replay',
+    defaultPath: fileName,
+    filters:     [{ name: 'Rocket League Replay', extensions: ['replay'] }],
+  })
+
+  if (canceled || !dest) return { ok: false, canceled: true }
+
+  try {
+    fs.copyFileSync(filePath, dest)
+    return { ok: true, dest }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
+Menu.setApplicationMenu(null)   // Elimina la barra de menú nativa (File/Edit/…)
+
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {

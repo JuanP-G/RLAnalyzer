@@ -1,6 +1,6 @@
 # RLAnalyzer
 
-Aplicación de escritorio para analizar en profundidad tus partidas de Rocket League. Procesa automáticamente tus archivos `.replay`, los almacena en una base de datos local y los presenta en un dashboard visual con estadísticas detalladas, historial de MMR y datos de perfil de tracker.gg.
+Aplicación de escritorio para analizar en profundidad tus partidas de Rocket League. Procesa automáticamente tus archivos `.replay`, los almacena en una base de datos local y los presenta en un dashboard visual con estadísticas detalladas, historial de MMR, datos de perfil de tracker.gg y un **visor 3D interactivo** de replays.
 
 ![RLAnalyzer](docs/screenshot.png)
 
@@ -10,8 +10,9 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 
 - **Procesado automático de replays** — detecta nuevos `.replay` y los analiza sin intervención
 - **Dashboard** — resumen de victorias, derrotas, win rate y últimas partidas
-- **Lista de partidas** — paginada, con navegación y detalle de cada partida
-- **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento
+- **Lista de partidas** — paginada, con filtros por resultado/modo/favoritas y detalle de cada partida
+- **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento, comparativa vs tu media histórica
+- **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables
 - **Perfil** — rangos por modo (1v1, 2v2, 3v3, extras, casual), historial de MMR y estadísticas de carrera
 - **Offline-first** — sirve los últimos datos conocidos cuando no hay conexión
 - **App de escritorio** — ventana nativa de Windows sin necesidad de abrir el navegador
@@ -80,13 +81,13 @@ La app arranca el backend y el frontend automáticamente y los cierra al cerrar 
 
 ## Perfil y tracker.gg
 
-El perfil muestra rangos, MMR e historial desde [tracker.gg](https://rocketleague.tracker.network). Sin API key, la app intenta scraping de la web como fallback. Cuando consigas tu key:
+El perfil muestra rangos, MMR e historial desde [tracker.gg](https://rocketleague.tracker.network). Sin API key, la app intenta scraping de la web como fallback. Cuando tengas tu key de [tracker.gg/developers](https://tracker.gg/developers):
 
-1. Edita `backend/routers/profile.py`, línea ~18:
-   ```python
-   TRACKER_API_KEY = "tu-api-key-aqui"
+1. Edita `backend/.env`:
    ```
-2. Reinicia la app
+   TRACKER_API_KEY=tu-api-key-aqui
+   ```
+2. Reinicia el backend
 
 Los datos se cachean en disco (sin expirar) para funcionar offline con los últimos datos conocidos.
 
@@ -97,31 +98,35 @@ Los datos se cachean en disco (sin expirar) para funcionar offline con los últi
 ```
 RLAnalyzer/
 ├── backend/                 # API REST — Python + FastAPI
-│   ├── config.py            # ← EDITA ESTO con tus datos
+│   ├── config.py            # ← EDITA ESTO con tus datos (nombre, carpeta replays)
+│   ├── .env                 # ← API keys (no se sube a git)
 │   ├── main.py              # Punto de entrada del servidor
 │   ├── parser.py            # Parseo de .replay con subtr-actor
 │   ├── watcher.py           # Vigilancia automática de la carpeta
+│   ├── replay_frames.py     # Extracción frame a frame con rrrocket (para el visor 3D)
 │   ├── models.py            # Modelos SQLAlchemy
 │   ├── database.py          # Conexión a SQLite
 │   └── routers/
-│       ├── replays.py       # Endpoints de partidas
+│       ├── replays.py       # Endpoints de partidas + frames
 │       └── profile.py       # Endpoints de perfil + caché tracker.gg
 ├── frontend/                # UI — React + Vite + Tailwind
 │   ├── src/
-│   │   ├── pages/           # Dashboard, ReplayList, ReplayDetail, Profile
-│   │   ├── components/      # Sidebar, StatCard
-│   │   └── api.js           # Cliente HTTP
+│   │   ├── pages/           # Dashboard, ReplayList, ReplayDetail, ReplayViewer, Profile
+│   │   ├── components/      # Sidebar, StatCard, TitleBar
+│   │   └── api.js           # Cliente HTTP con caché en memoria
 │   └── public/
 │       └── ranks/           # Iconos PNG de rangos (offline)
 ├── electron/                # Wrapper de escritorio
 │   ├── main.js              # Gestiona ventana + procesos hijo
+│   ├── preload.js           # Puente seguro IPC (contextIsolation)
 │   └── icon.ico             # Icono de la app
 ├── data/                    # Generado automáticamente
 │   ├── rl_data.db           # Base de datos SQLite
-│   └── profile_cache.json   # Caché de perfil tracker.gg
+│   ├── profile_cache.json   # Caché de perfil tracker.gg
+│   └── frames/              # Caché de frames 3D por replay (JSON compacto)
 ├── docs/                    # Documentación
-├── tools/                   # rrrocket (herramienta auxiliar)
-├── config.py → backend/config.py
+├── tools/
+│   └── rrrocket.exe         # Parser de network frames para el visor 3D
 ├── setup.bat                # Instalación inicial (ejecutar una vez)
 ├── start-app.bat            # Arranque con consola (debug)
 ├── launch.vbs               # Arranque sin consola (uso normal)
@@ -137,10 +142,25 @@ RLAnalyzer/
 | Backend | Python 3 + FastAPI + Uvicorn |
 | Base de datos | SQLite + SQLAlchemy |
 | Parser de replays | subtr-actor-py (Rust → Python) |
+| Parser de frames | rrrocket.exe (network frames) |
 | Frontend | React 18 + Vite + Tailwind CSS |
+| Visor 3D | Three.js + OrbitControls |
 | Gráficos | Recharts |
-| Desktop | Electron |
-| Perfil | tracker.gg API / web scraping |
+| Desktop | Electron (frameless, custom titlebar) |
+| Perfil | tracker.gg API / web scraping / caché offline |
+
+---
+
+## Visor 3D
+
+Desde el detalle de cualquier partida, pulsa **"Ver en 3D"** para abrir el visor interactivo.
+
+- **Primera vez**: puede tardar 15-30 segundos mientras `rrrocket.exe` procesa los network frames. Las siguientes veces usa caché en disco (`data/frames/<id>.json`).
+- **Controles de cámara**: arrastra para rotar, rueda para zoom, click derecho para desplazar.
+- **Timeline**: haz clic en los marcadores de gol (líneas de color) para saltar al momento del gol.
+- **Velocidad**: botones 0.5×, 1×, 2×, 4× en la esquina superior derecha.
+
+> Los frames se cachean en `data/frames/`. Para forzar la re-extracción, borra el archivo `.json` correspondiente.
 
 ---
 

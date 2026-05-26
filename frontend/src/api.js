@@ -45,6 +45,7 @@ export const api = {
     return fetchJSON(`${BASE}/replays?${p}`)
   },
   replay:         (id)                   => fetchJSON(`${BASE}/replays/${id}`),
+  replayFrames:   (id)                   => fetchJSON(`${BASE}/replays/${id}/frames`),
   setFavorite:    (id, value)            => fetch(`${BASE}/replays/${id}/favorite`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },

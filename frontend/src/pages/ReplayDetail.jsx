@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { getMapName } from '../utils/mapNames'
+
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 
 const SPEED_MAX        = 83
 const SPEED_SUPERSONIC = 79
@@ -292,9 +294,40 @@ function StatsComparison({ me, myStats }) {
   )
 }
 
+// ── Botón de acción sobre el archivo ─────────────────────────────────────────
+function ReplayFileButton({ icon, label, onClick, disabled, title }) {
+  const [loading, setLoading] = useState(false)
+  const handle = async () => {
+    if (disabled || loading) return
+    setLoading(true)
+    try { await onClick() } finally { setLoading(false) }
+  }
+  return (
+    <button
+      onClick={handle}
+      disabled={disabled || loading}
+      title={disabled ? 'Archivo no disponible en este equipo' : title}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150"
+      style={{
+        background: disabled ? '#071829' : '#0D2240',
+        border:     `1px solid ${disabled ? '#0D2240' : '#1A3A5C'}`,
+        color:      disabled ? '#2A4A68' : '#90B8D8',
+        cursor:     disabled ? 'not-allowed' : 'pointer',
+        opacity:    disabled ? 0.5 : 1,
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = '#142F52' }}
+      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = '#0D2240' }}
+    >
+      <span>{loading ? '…' : icon}</span>
+      {label}
+    </button>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function ReplayDetail() {
-  const { id } = useParams()
+  const { id }     = useParams()
+  const navigate   = useNavigate()
   const [replay,  setReplay]  = useState(null)
   const [myStats, setMyStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -342,16 +375,69 @@ export default function ReplayDetail() {
         >
           ← Volver a partidas
         </Link>
-        <div className="mt-4 flex items-start justify-between">
-          <div>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
             <h1 className="font-display font-bold text-gray-100 capitalize" style={{ fontSize: '1.6rem', letterSpacing: '0.03em' }}>
               {getMapName(replay.map_name)}
             </h1>
             <p className="text-gray-500 text-sm mt-1 capitalize">{formatDate(replay.played_at)}</p>
+
+            {/* Botones de acción */}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {/* Ver en 3D — siempre visible si hay file_path */}
+              <button
+                onClick={() => navigate(`/replays/${id}/viewer`)}
+                disabled={!replay.file_path}
+                title={replay.file_path ? 'Abrir visor 3D' : 'Archivo no disponible en este equipo'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+                style={{
+                  background: replay.file_path ? 'linear-gradient(135deg,#00A8FF22,#0070CC22)' : '#071829',
+                  border:     `1px solid ${replay.file_path ? '#00A8FF55' : '#0D2240'}`,
+                  color:      replay.file_path ? '#00A8FF' : '#2A4A68',
+                  cursor:     replay.file_path ? 'pointer' : 'not-allowed',
+                }}
+                onMouseEnter={e => { if (replay.file_path) e.currentTarget.style.background = 'linear-gradient(135deg,#00A8FF33,#0070CC33)' }}
+                onMouseLeave={e => { if (replay.file_path) e.currentTarget.style.background = 'linear-gradient(135deg,#00A8FF22,#0070CC22)' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.2">
+                  <path d="M6.5 1.5L11.5 6.5L6.5 11.5"/>
+                  <circle cx="6" cy="6.5" r="4.5"/>
+                  <circle cx="6" cy="6.5" r="1.5" fill="currentColor" stroke="none"/>
+                </svg>
+                Ver en 3D
+              </button>
+
+              {/* Botones de archivo — solo en Electron */}
+              {isElectron && (
+                <>
+                  <ReplayFileButton
+                    icon="📁"
+                    label="Abrir ubicación"
+                    title="Abrir la carpeta del archivo en el Explorador"
+                    onClick={async () => {
+                      const r = await window.electronAPI.showReplayInFolder(replay.file_path)
+                      if (!r.ok) alert(r.error || 'No se pudo abrir la ubicación')
+                    }}
+                    disabled={!replay.file_path}
+                  />
+                  <ReplayFileButton
+                    icon="💾"
+                    label="Exportar"
+                    title="Copiar el archivo .replay a otra carpeta"
+                    onClick={async () => {
+                      const r = await window.electronAPI.exportReplay(replay.file_path)
+                      if (!r.ok && !r.canceled) alert(r.error || 'No se pudo exportar')
+                    }}
+                    disabled={!replay.file_path}
+                  />
+                </>
+              )}
+            </div>
           </div>
+
           {/* Banner resultado estilo RL */}
           <div
-            className="font-display font-bold text-2xl tracking-widest uppercase px-6 py-2 rounded-lg"
+            className="font-display font-bold text-2xl tracking-widest uppercase px-6 py-2 rounded-lg flex-shrink-0"
             style={{
               color: resCfg.color,
               background: `${resCfg.glow}`,

@@ -127,10 +127,11 @@ function ErrorBox({ error, onRetry }) {
 
       {/* Solución */}
       <div className="rounded-lg p-3" style={{ background: '#04101E', border: '1px solid #122A4D' }}>
-        <p className="text-gray-400 text-[11px] uppercase tracking-wider font-display mb-2">Solución — cuando llegue tu API key</p>
-        <p className="text-gray-400 text-[10px] mb-1 font-mono"># backend/routers/profile.py  línea 18</p>
-        <p className="text-rl-blue text-xs font-mono">TRACKER_API_KEY = <span className="text-win">"pega-tu-key-aquí"</span></p>
-        <p className="text-gray-400 text-[10px] mt-1 font-mono"># Luego reinicia el backend (cierra y vuelve a abrir start.bat)</p>
+        <p className="text-gray-400 text-[11px] uppercase tracking-wider font-display mb-2">Solución — API key de tracker.gg</p>
+        <p className="text-gray-400 text-[10px] mb-1 font-mono"># Edita el archivo: backend/.env</p>
+        <p className="text-rl-blue text-xs font-mono">TRACKER_API_KEY=<span className="text-win">tu-key-aquí</span></p>
+        <p className="text-gray-400 text-[10px] mt-1 font-mono"># Consigue tu key en: tracker.gg/developers</p>
+        <p className="text-gray-400 text-[10px] mt-1 font-mono"># Luego reinicia el backend</p>
       </div>
 
       <button onClick={onRetry}
