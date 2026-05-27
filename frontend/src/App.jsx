@@ -36,8 +36,8 @@ export default function App() {
             <Route path="/"              element={<Dashboard />} />
             <Route path="/replays"       element={<ReplayList />} />
             <Route path="/replays/:id"   element={<ReplayDetail />} />
-          <Route path="/replays/:id/viewer" element={<ReplayViewer />} />
-            <Route path="/viewer"          element={<ViewerList />} />
+          <Route path="/viewer"          element={<ViewerList />} />
+            <Route path="/viewer/:id"      element={<ReplayViewer />} />
             <Route path="/profile"        element={<Profile />} />
             <Route path="/players/:name"  element={<PlayerHistory />} />
           </Routes>

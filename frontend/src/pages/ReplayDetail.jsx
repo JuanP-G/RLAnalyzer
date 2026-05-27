@@ -387,7 +387,7 @@ export default function ReplayDetail() {
             <div className="flex gap-2 mt-3 flex-wrap">
               {/* Ver en 3D — siempre visible si hay file_path */}
               <button
-                onClick={() => navigate(`/replays/${id}/viewer`)}
+                onClick={() => navigate(`/viewer/${id}`)}
                 disabled={!replay.file_path}
                 title={replay.file_path ? 'Abrir visor 3D' : 'Archivo no disponible en este equipo'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"

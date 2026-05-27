@@ -172,7 +172,7 @@ export default function ViewerList() {
                   <tr key={r.id}
                       className="transition-colors hover:bg-bg-hover cursor-pointer group"
                       style={{ borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240' }}
-                      onClick={() => navigate(`/replays/${r.id}/viewer`)}>
+                      onClick={() => navigate(`/viewer/${r.id}`)}>
                     <td className="px-4 py-3">
                       <ResultDot result={r.result} />
                     </td>

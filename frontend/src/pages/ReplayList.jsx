@@ -319,7 +319,7 @@ export default function ReplayList() {
                     </td>
                     <td className="px-3 py-3">
                       <button
-                        onClick={e => { e.stopPropagation(); navigate(`/replays/${r.id}/viewer`) }}
+                        onClick={e => { e.stopPropagation(); navigate(`/viewer/${r.id}`) }}
                         title="Ver en visor 3D"
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all hover:scale-105"
                         style={{

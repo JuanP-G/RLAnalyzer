@@ -236,11 +236,18 @@ export default function ReplayViewer() {
           <p className="text-gray-200 font-display font-bold text-base tracking-wide mb-3">
             Ballchasing no disponible
           </p>
-          {(BC_REASON[bcStatus] || bcError || 'Error desconocido').split('\n').map((line, i) => (
+          {(BC_REASON[bcStatus] || 'Error desconocido').split('\n').map((line, i) => (
             <p key={i} className={i === 0 ? 'text-gray-400 text-sm' : 'text-gray-600 text-xs mt-1'}>
               {line}
             </p>
           ))}
+          {/* Detalle técnico (solo cuando el backend manda un mensaje de error) */}
+          {bcError && !BC_REASON[bcStatus] && (
+            <p className="text-gray-600 text-xs mt-2 font-mono break-all">{bcError}</p>
+          )}
+          {bcStatus === 'error' && bcError && (
+            <p className="text-gray-600 text-xs mt-2 font-mono break-all">{bcError}</p>
+          )}
         </div>
 
         {/* Botón continuar */}
