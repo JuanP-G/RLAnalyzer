@@ -223,7 +223,7 @@ export default function ReplayViewer() {
 
   // ── Estado: subiendo a Ballchasing ────────────────────────────────────────
   if (viewerState === 'uploading') return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
       <TopBar />
       <div className="flex-1 flex flex-col items-center justify-center gap-5">
         <div className="relative w-16 h-16">
@@ -244,9 +244,14 @@ export default function ReplayViewer() {
   if (viewerState === 'bc_ready') {
 
     // ── En Electron: webview embebido (sin salir a navegador externo) ─────
+    // IMPORTANTE: flex:1 + minHeight:0 en lugar de height:100%.
+    // height:100% requiere padre con altura "definida" (CSS spec). main la tiene por
+    // flex-stretch, que no cuenta como definida → height:100% resuelve a auto → roto.
+    // flex:1 usa el algoritmo flexbox directamente y funciona con alturas implícitas.
     if (isElectron) return (
       <div style={{
-        height: '100%', display: 'flex', flexDirection: 'column',
+        flex: '1 1 0%', minHeight: 0,
+        display: 'flex', flexDirection: 'column',
         overflow: 'hidden', background: '#04090F',
       }}>
 
@@ -311,7 +316,7 @@ export default function ReplayViewer() {
 
     // ── En navegador web: botón que abre pestaña externa ─────────────────
     return (
-      <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
         <TopBar />
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
           <div className="w-20 h-20 rounded-full flex items-center justify-center"
@@ -350,7 +355,7 @@ export default function ReplayViewer() {
 
   // ── Estado: Ballchasing no disponible ────────────────────────────────────
   if (viewerState === 'bc_failed') return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
       <TopBar />
       <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
         {/* Icono de aviso */}
@@ -403,7 +408,7 @@ export default function ReplayViewer() {
   const safeDuration = duration || 1
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
 
       {/* ── Barra superior ────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-1.5"
