@@ -249,7 +249,10 @@ export default function ReplayViewer() {
 
     // ── En Electron: webview embebido (sin salir a navegador externo) ─────
     if (isElectron) return (
-      <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+      <div style={{
+        height: '100%', display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', background: '#04090F',
+      }}>
 
         {/* Barra de control */}
         <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2"
@@ -279,25 +282,41 @@ export default function ReplayViewer() {
           </div>
         </div>
 
-        {/* Webview: Ballchasing embebido */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* Webview: Ballchasing embebido
+            IMPORTANTE: el <webview> de Electron no hereda altura de flex-1 con height:100%.
+            La solución es un contenedor con position:relative + inset:0 absoluto en el webview. */}
+        <div className="flex-1" style={{ position: 'relative', minHeight: 0 }}>
           {bcWebLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10"
-                 style={{ background: '#04090F' }}>
-              <div className="relative w-14 h-14">
-                <div className="absolute inset-0 rounded-full border-2 border-t-rl-blue border-transparent animate-spin" />
-                <div className="absolute inset-2 flex items-center justify-center">
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 16, background: '#04090F', zIndex: 10,
+            }}>
+              <div style={{ position: 'relative', width: 56, height: 56 }}>
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%',
+                  border: '2px solid transparent', borderTopColor: '#00A8FF',
+                  animation: 'spin 0.9s linear infinite',
+                }} />
+                <div style={{
+                  position: 'absolute', inset: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
                   <BcIcon size={20} color="#2B6FD4" />
                 </div>
               </div>
-              <p className="text-gray-400 text-sm">Cargando visor de Ballchasing…</p>
+              <p style={{ color: '#6A90BC', fontSize: 14 }}>Cargando visor de Ballchasing…</p>
             </div>
           )}
           {/* eslint-disable-next-line react/no-unknown-property */}
           <webview
             ref={webviewRef}
             src={bcWatchUrl}
-            style={{ width: '100%', height: '100%', display: 'block' }}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              width: '100%', height: '100%',
+              display: 'block',
+            }}
             allowpopups=""
           />
         </div>
