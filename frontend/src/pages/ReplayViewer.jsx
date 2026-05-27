@@ -71,13 +71,65 @@ export default function ReplayViewer() {
   const webviewRef      = useRef(null)
   const [bcWebLoading, setBcWebLoading] = useState(true)
 
-  // Cuando bc_ready y Electron: escucha la carga del webview
+  // URL de Ballchasing con el hash #watch para ir directo al visor 3D
+  const bcWatchUrl = bcUrl ? `${bcUrl.split('#')[0]}#watch` : null
+
+  // CSS que se inyecta en el webview para ocultar el chrome de Ballchasing
+  // y que el visor 3D ocupe toda la pantalla
+  const BC_INJECT_CSS = `
+    /* Ocultar navbar, header y barra de tabs de navegación */
+    nav, header,
+    [class*="navbar"], [class*="nav-bar"],
+    [class*="header"], [class*="topbar"],
+    [class*="tab-nav"], [class*="tabs-nav"],
+    [role="navigation"], [role="banner"] {
+      display: none !important;
+    }
+    /* Quitar padding-top del body que compensa el nav sticky */
+    body, html {
+      padding-top: 0 !important;
+      margin-top:  0 !important;
+      overflow-x: hidden;
+    }
+    /* Ocultar botón de soporte/donación */
+    [class*="support"], [class*="patron"], [class*="donate"],
+    [class*="banner"], [class*="alert"] {
+      display: none !important;
+    }
+    /* La sección #watch llena el alto disponible */
+    #watch {
+      min-height: 100vh;
+      padding-top: 0 !important;
+    }
+    /* Hacer que el canvas sea responsivo */
+    #watch canvas {
+      max-width: 100% !important;
+    }
+  `
+
+  // Cuando bc_ready y Electron: espera la carga del webview,
+  // inyecta CSS de limpieza y desplaza al visor 3D
   useEffect(() => {
     if (viewerState !== 'bc_ready' || !isElectron) return
     setBcWebLoading(true)
     const wv = webviewRef.current
     if (!wv) return
-    const onLoad = () => setBcWebLoading(false)
+
+    const onLoad = async () => {
+      try {
+        // Inyectar CSS para ocultar el chrome de Ballchasing
+        await wv.insertCSS(BC_INJECT_CSS)
+        // Desplazar al elemento #watch por si el hash no fue suficiente
+        await wv.executeJavaScript(`
+          (() => {
+            const el = document.getElementById('watch');
+            if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
+          })();
+        `)
+      } catch (_) { /* no crítico */ }
+      setBcWebLoading(false)
+    }
+
     wv.addEventListener('did-finish-load', onLoad)
     return () => wv.removeEventListener('did-finish-load', onLoad)
   }, [viewerState])
@@ -213,7 +265,7 @@ export default function ReplayViewer() {
             <span className="text-gray-600 text-xs font-normal">· Ballchasing</span>
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => window.open(bcUrl, '_blank')}
+            <button onClick={() => window.open(bcWatchUrl, '_blank')}
               className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
               style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               title="Abrir en el navegador del sistema">
@@ -244,8 +296,9 @@ export default function ReplayViewer() {
           {/* eslint-disable-next-line react/no-unknown-property */}
           <webview
             ref={webviewRef}
-            src={bcUrl}
+            src={bcWatchUrl}
             style={{ width: '100%', height: '100%', display: 'block' }}
+            allowpopups=""
           />
         </div>
       </div>
