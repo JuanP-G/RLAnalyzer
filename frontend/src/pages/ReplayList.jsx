@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { getMapName } from '../utils/mapNames'
 
@@ -68,6 +68,7 @@ function FilterChip({ label, active, onClick, color }) {
 }
 
 export default function ReplayList() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Estado persistido en URL para que el botón atrás restaure posición y filtros
@@ -282,7 +283,7 @@ export default function ReplayList() {
                   <th className="px-4 py-3 text-center">Marcador</th>
                   <th className="px-4 py-3 text-left">Duración</th>
                   <th className="px-4 py-3 text-left">Fecha</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3" colSpan={2}></th>
                 </tr>
               </thead>
               <tbody>
@@ -316,7 +317,32 @@ export default function ReplayList() {
                     <td className="px-4 py-3 text-gray-400 text-xs">
                       {formatDate(r.played_at)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={e => { e.stopPropagation(); navigate(`/replays/${r.id}/viewer`) }}
+                        title="Ver en visor 3D"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all hover:scale-105"
+                        style={{
+                          background: '#071829',
+                          border: '1px solid #122A4D',
+                          color: '#5888B4',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#00A8FF'; e.currentTarget.style.borderColor = '#00A8FF44' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#5888B4'; e.currentTarget.style.borderColor = '#122A4D' }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+                          <polygon points="5,0.5 9,3 9,7 5,9.5 1,7 1,3" opacity="0.2" fill="currentColor" stroke="none"/>
+                          <polyline points="5,0.5 9,3 5,5.5 1,3 5,0.5"/>
+                          <line x1="5" y1="5.5" x2="5" y2="9.5"/>
+                          <line x1="9" y1="3" x2="9" y2="7"/>
+                          <line x1="1" y1="3" x2="1" y2="7"/>
+                          <line x1="5" y1="9.5" x2="1" y2="7"/>
+                          <line x1="5" y1="9.5" x2="9" y2="7"/>
+                        </svg>
+                        3D
+                      </button>
+                    </td>
+                    <td className="px-2 py-3">
                       <Link to={`/replays/${r.id}`} className="text-rl-blue text-xs hover:underline">
                         Detalles →
                       </Link>

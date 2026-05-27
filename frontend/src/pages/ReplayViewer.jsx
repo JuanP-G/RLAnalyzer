@@ -232,19 +232,15 @@ export default function ReplayViewer() {
           </svg>
         </div>
 
-        <div className="text-center max-w-sm">
+        <div className="text-center max-w-xs">
           <p className="text-gray-200 font-display font-bold text-base tracking-wide mb-3">
             Ballchasing no disponible
           </p>
-          {/* Motivo */}
-          <div className="rounded-xl px-4 py-3 text-left"
-               style={{ background: '#07111E', border: '1px solid #1A3A5C' }}>
-            {(BC_REASON[bcStatus] || bcError || 'Error desconocido').split('\n').map((line, i) => (
-              <p key={i} className={i === 0 ? 'text-gray-300 text-sm font-medium' : 'text-gray-500 text-xs mt-1'}>
-                {line}
-              </p>
-            ))}
-          </div>
+          {(BC_REASON[bcStatus] || bcError || 'Error desconocido').split('\n').map((line, i) => (
+            <p key={i} className={i === 0 ? 'text-gray-400 text-sm' : 'text-gray-600 text-xs mt-1'}>
+              {line}
+            </p>
+          ))}
         </div>
 
         {/* Botón continuar */}

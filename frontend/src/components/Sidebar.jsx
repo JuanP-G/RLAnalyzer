@@ -31,10 +31,24 @@ function IconProfile() {
     </svg>
   )
 }
+function IconViewer3D() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+      <polygon points="8,1.5 14,5 14,11 8,14.5 2,11 2,5" opacity="0.2" fill="currentColor" stroke="none"/>
+      <polyline points="8,1.5 14,5 8,8.5 2,5 8,1.5"/>
+      <line x1="8"  y1="8.5" x2="8"  y2="14.5"/>
+      <line x1="14" y1="5"   x2="14" y2="11"/>
+      <line x1="2"  y1="5"   x2="2"  y2="11"/>
+      <line x1="8"  y1="14.5" x2="2"  y2="11"/>
+      <line x1="8"  y1="14.5" x2="14" y2="11"/>
+    </svg>
+  )
+}
 const links = [
   { to: '/profile', label: 'Mi Perfil',  Icon: IconProfile },
-  { to: '/',        label: 'Dashboard', Icon: IconDashboard },
-  { to: '/replays', label: 'Partidas',  Icon: IconReplays },
+  { to: '/',        label: 'Dashboard',  Icon: IconDashboard },
+  { to: '/replays', label: 'Partidas',   Icon: IconReplays },
+  { to: '/viewer',  label: 'Visor 3D',   Icon: IconViewer3D },
 ]
 
 export default function Sidebar({ playerName, folderOk }) {
