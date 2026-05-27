@@ -1,8 +1,10 @@
 /**
- * ReplayViewer.jsx — Página del visor 3D.
+ * ReplayViewer.jsx — Visor 3D de replays.
  *
- * Fuente preferida: Ballchasing.com (abre su visor en el navegador).
- * Fallback:         Visor propio Three.js (Viewer3D.jsx).
+ * Flujo:
+ *   1. Intenta subir el replay a Ballchasing → si ok, muestra botón para abrir su visor 3D.
+ *   2. Si falla (sin token / límite / error) → pantalla de aviso + botón "Continuar con visor propio".
+ *   3. Solo cuando el usuario elige el visor propio se cargan y procesan los frames (15-30 s).
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
@@ -18,133 +20,265 @@ function fmt(s) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+// Mensajes legibles para cada status de Ballchasing
+const BC_REASON = {
+  no_token:      'No hay token de Ballchasing configurado.\nAñade BALLCHASING_TOKEN en backend/.env',
+  no_file:       'El archivo .replay no está disponible en este equipo.',
+  limit_exceeded:'Has alcanzado el límite de subidas de Ballchasing.\nPuedes seguir usando el visor propio.',
+  error:         'No se pudo conectar con Ballchasing.',
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function ReplayViewer() {
   const { id }   = useParams()
   const navigate = useNavigate()
 
-  // ── Estado de datos ───────────────────────────────────────────────────────
-  const [replay,    setReplay]    = useState(null)
-  const [frames,    setFrames]    = useState(null)
-  const [bcStatus,  setBcStatus]  = useState('idle')  // idle | loading | cached | uploaded | no_file | no_token | error
-  const [bcUrl,     setBcUrl]     = useState(null)
-  const [loadMsg,   setLoadMsg]   = useState('Cargando datos…')
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
+  const [replay,  setReplay]  = useState(null)
 
-  // ── Estado de reproducción ────────────────────────────────────────────────
+  /**
+   * viewerState:
+   *   'uploading'  — intentando subir a Ballchasing
+   *   'bc_ready'   — URL de Ballchasing disponible, mostrar botón
+   *   'bc_failed'  — Ballchasing no disponible, mostrar aviso
+   *   'our_viewer' — cargar y mostrar nuestro visor Three.js
+   */
+  const [viewerState, setViewerState] = useState('uploading')
+  const [bcUrl,       setBcUrl]       = useState(null)
+  const [bcStatus,    setBcStatus]    = useState(null)  // status raw del backend
+  const [bcError,     setBcError]     = useState(null)
+
+  // Solo se usan en estado 'our_viewer'
+  const [frames,    setFrames]    = useState(null)
+  const [framesMsg, setFramesMsg] = useState('Preparando frames…')
+  const [framesErr, setFramesErr] = useState(null)
   const [playing,   setPlaying]   = useState(false)
   const [currentT,  setCurrentT]  = useState(0)
   const [speed,     setSpeed]     = useState(1)
   const [duration,  setDuration]  = useState(0)
 
-  const playingRef  = useRef(false)
   const currentTRef = useRef(0)
   const labelRefs   = useRef([])
 
-  useEffect(() => { playingRef.current = playing }, [playing])
-
-  // ── Carga de datos ────────────────────────────────────────────────────────
+  // ── Carga inicial: replay metadata + intento Ballchasing ─────────────────
   useEffect(() => {
     let alive = true
-    async function load() {
+    async function init() {
       try {
-        setLoadMsg('Cargando detalles del replay…')
         const r = await api.replay(id)
         if (!alive) return
         setReplay(r)
+      } catch (e) {
+        // Si falla el metadata vamos directo al visor propio con error
+        if (alive) { setBcStatus('error'); setBcError(e.message); setViewerState('bc_failed') }
+        return
+      }
 
-        // Ballchasing (no bloquea la carga de frames)
-        setBcStatus('loading')
-        api.ballchasing(id)
-          .then(bc => {
-            if (!alive) return
-            setBcStatus(bc.status)
-            setBcUrl(bc.url || null)
-          })
-          .catch(() => setBcStatus('error'))
+      try {
+        const bc = await api.ballchasing(id)
+        if (!alive) return
+        setBcStatus(bc.status)
+        if (bc.url) {
+          setBcUrl(bc.url)
+          setViewerState('bc_ready')
+        } else {
+          setBcError(bc.error || null)
+          setViewerState('bc_failed')
+        }
+      } catch (e) {
+        if (alive) { setBcStatus('error'); setBcError(e.message); setViewerState('bc_failed') }
+      }
+    }
+    init()
+    return () => { alive = false }
+  }, [id])
 
-        setLoadMsg('Procesando frames (puede tardar ~15-30 s la primera vez)…')
+  // ── Carga de frames (solo cuando el usuario elige el visor propio) ────────
+  useEffect(() => {
+    if (viewerState !== 'our_viewer') return
+    if (frames) return  // ya cargados
+    let alive = true
+    async function loadFrames() {
+      try {
+        setFramesMsg('Procesando frames (puede tardar ~15-30 s la primera vez)…')
         const f = await api.replayFrames(id)
         if (!alive) return
         setFrames(f)
         setDuration(f.duration || 0)
-        setCurrentT(0)
-        currentTRef.current = 0
+        setCurrentT(0); currentTRef.current = 0
       } catch (e) {
-        if (alive) setError(e.message || 'Error cargando frames')
-      } finally {
-        if (alive) setLoading(false)
+        if (alive) setFramesErr(e.message || 'Error cargando frames')
       }
     }
-    load()
+    loadFrames()
     return () => { alive = false }
-  }, [id])
+  }, [viewerState, id])
 
-  // ── Reproducción ──────────────────────────────────────────────────────────
+  // ── Controles de reproducción ─────────────────────────────────────────────
   const handleTimeUpdate = useCallback((t) => {
-    currentTRef.current = t
-    setCurrentT(t)
+    currentTRef.current = t; setCurrentT(t)
     if (t >= duration && duration > 0) setPlaying(false)
   }, [duration])
 
   const togglePlay = useCallback(() => {
-    if (currentTRef.current >= duration) {
-      currentTRef.current = 0; setCurrentT(0)
-    }
+    if (currentTRef.current >= duration) { currentTRef.current = 0; setCurrentT(0) }
     setPlaying(p => !p)
   }, [duration])
 
-  const seekTo = useCallback(t => {
-    currentTRef.current = t; setCurrentT(t)
-  }, [])
+  const seekTo = useCallback(t => { currentTRef.current = t; setCurrentT(t) }, [])
 
-  // Marcador dinámico
   const scores = useMemo(() => {
     const s = [0, 0]
     if (frames) for (const g of (frames.goals || [])) if (g.time <= currentT) s[g.team ?? 0]++
     return s
   }, [frames, Math.floor(currentT)])
 
-  const team0 = (frames?.players || []).filter(p => p.team === 0)
-  const team1 = (frames?.players || []).filter(p => p.team === 1)
-  const goalMarkers  = frames?.goals || []
-  const safeDuration = duration || 1
+  // ── Renders por estado ────────────────────────────────────────────────────
 
-  // ── Abrir en Ballchasing ──────────────────────────────────────────────────
-  function openBallchasing() {
-    if (bcUrl) window.open(bcUrl, '_blank')
-  }
-
-  // ── Renders de estado ─────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="h-full flex flex-col items-center justify-center gap-4" style={{ background: '#04090F' }}>
-      <div className="w-8 h-8 rounded-full border-2 border-t-rl-blue border-bg-tertiary animate-spin" />
-      <p className="text-gray-400 text-sm">{loadMsg}</p>
+  // Barra de navegación superior (compartida por todos los estados)
+  const TopBar = ({ children }) => (
+    <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3"
+         style={{ background: '#030810', borderBottom: '1px solid #0A1E35' }}>
+      <button onClick={() => navigate(-1)}
+        className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+        ←
+      </button>
+      <span className="text-gray-300 text-sm font-display font-semibold tracking-wide">
+        {replay ? getMapName(replay.map_name) : '—'}
+      </span>
+      {children}
     </div>
   )
-  if (error) return (
-    <div className="h-full flex items-center justify-center px-8" style={{ background: '#04090F' }}>
-      <div className="max-w-lg rounded-xl p-6 text-center" style={{ background: '#071829', border: '1px solid #1A3A5C' }}>
-        <p className="text-red-400 font-bold uppercase text-sm mb-2">⚠ Error al cargar el visor</p>
-        <p className="text-gray-400 text-xs mb-4 font-mono whitespace-pre-wrap text-left max-h-48 overflow-auto">{error}</p>
-        <button onClick={() => navigate(-1)} className="text-rl-blue text-sm hover:underline"
-          style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Volver</button>
+
+  // ── Estado: subiendo a Ballchasing ────────────────────────────────────────
+  if (viewerState === 'uploading') return (
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+      <TopBar />
+      <div className="flex-1 flex flex-col items-center justify-center gap-5">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-2 border-t-rl-blue border-transparent animate-spin" />
+          <div className="absolute inset-2 flex items-center justify-center">
+            <BcIcon size={24} color="#2B6FD4" />
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-gray-200 font-semibold text-sm">Preparando visor 3D…</p>
+          <p className="text-gray-500 text-xs mt-1">Comprobando Ballchasing</p>
+        </div>
       </div>
     </div>
   )
 
-  // ── Render principal ──────────────────────────────────────────────────────
+  // ── Estado: Ballchasing listo ─────────────────────────────────────────────
+  if (viewerState === 'bc_ready') return (
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+      <TopBar />
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
+        {/* Icono de éxito */}
+        <div className="w-20 h-20 rounded-full flex items-center justify-center"
+             style={{ background: '#0D2240', border: '2px solid #2B6FD455' }}>
+          <BcIcon size={36} color="#90C8FF" />
+        </div>
+
+        <div className="text-center">
+          <p className="text-gray-100 font-display font-bold text-lg tracking-wide mb-1">
+            Replay disponible en Ballchasing
+          </p>
+          <p className="text-gray-500 text-sm">
+            {bcStatus === 'cached' ? 'Subido anteriormente · cargando desde caché' : 'Subido correctamente'}
+          </p>
+        </div>
+
+        {/* Botón principal */}
+        <button
+          onClick={() => window.open(bcUrl, '_blank')}
+          className="flex items-center gap-3 px-8 py-4 rounded-xl font-semibold text-base transition-all hover:scale-[1.03]"
+          style={{
+            background: 'linear-gradient(135deg, #1A3F80, #0E2850)',
+            border: '1px solid #3A8EFF55',
+            color: '#90C8FF',
+            boxShadow: '0 0 32px #2B6FD422',
+          }}>
+          <BcIcon size={20} color="#90C8FF" />
+          Ver en Ballchasing
+          <span className="text-lg opacity-70">↗</span>
+        </button>
+
+        <p className="text-gray-600 text-xs text-center max-w-xs">
+          Se abrirá el visor 3D oficial de ballchasing.com en tu navegador.
+        </p>
+
+        {/* Fallback discreto */}
+        <button
+          onClick={() => setViewerState('our_viewer')}
+          className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+          Usar visor propio de RLAnalyzer →
+        </button>
+      </div>
+    </div>
+  )
+
+  // ── Estado: Ballchasing no disponible ────────────────────────────────────
+  if (viewerState === 'bc_failed') return (
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+      <TopBar />
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
+        {/* Icono de aviso */}
+        <div className="w-20 h-20 rounded-full flex items-center justify-center"
+             style={{ background: '#1A0D0D', border: '2px solid #FF474722' }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#FF7A7A" strokeWidth="1.5">
+            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+        </div>
+
+        <div className="text-center max-w-sm">
+          <p className="text-gray-200 font-display font-bold text-base tracking-wide mb-3">
+            Ballchasing no disponible
+          </p>
+          {/* Motivo */}
+          <div className="rounded-xl px-4 py-3 text-left"
+               style={{ background: '#07111E', border: '1px solid #1A3A5C' }}>
+            {(BC_REASON[bcStatus] || bcError || 'Error desconocido').split('\n').map((line, i) => (
+              <p key={i} className={i === 0 ? 'text-gray-300 text-sm font-medium' : 'text-gray-500 text-xs mt-1'}>
+                {line}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        {/* Botón continuar */}
+        <button
+          onClick={() => setViewerState('our_viewer')}
+          className="flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.03]"
+          style={{
+            background: 'linear-gradient(135deg, #0D2240, #071829)',
+            border: '1px solid #1A3A5C',
+            color: '#7AADD4',
+            boxShadow: '0 0 20px #00000044',
+          }}>
+          Continuar con visor propio
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+  )
+
+  // ── Estado: visor propio ──────────────────────────────────────────────────
+  const team0        = (frames?.players || []).filter(p => p.team === 0)
+  const team1        = (frames?.players || []).filter(p => p.team === 1)
+  const goalMarkers  = frames?.goals || []
+  const safeDuration = duration || 1
+
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
 
-      {/* ── Barra superior ──────────────────────────────────────────────── */}
+      {/* ── Barra superior ────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-1.5"
            style={{ background: '#030810', borderBottom: '1px solid #0A1E35' }}>
 
-        {/* Atrás */}
         <button onClick={() => navigate(-1)}
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+          className="text-gray-500 hover:text-gray-300 text-sm transition-colors flex items-center gap-1"
           style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
           ← {replay ? getMapName(replay.map_name) : '—'}
         </button>
@@ -162,11 +296,18 @@ export default function ReplayViewer() {
                style={{ background: '#7A3800', minWidth: 44, textAlign: 'center' }}>{scores[1]}</div>
         </div>
 
-        {/* Botón Ballchasing */}
-        <BallchasingButton status={bcStatus} url={bcUrl} onClick={openBallchasing} />
+        {/* Volver a Ballchasing si estaba disponible */}
+        {bcUrl && (
+          <button onClick={() => window.open(bcUrl, '_blank')}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all hover:opacity-90 flex-shrink-0"
+            style={{ background: '#0D2240', border: '1px solid #2B6FD455', color: '#6AAEFF' }}
+            title="Ver en Ballchasing">
+            <BcIcon size={11} color="#6AAEFF" /> Ballchasing ↗
+          </button>
+        )}
 
         {/* Velocidad */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {[0.25, 0.5, 1, 2].map(v => (
             <button key={v} onClick={() => setSpeed(v)}
               className="px-2 py-0.5 rounded text-xs font-display font-semibold"
@@ -179,7 +320,7 @@ export default function ReplayViewer() {
         </div>
       </div>
 
-      {/* ── Área central ────────────────────────────────────────────────── */}
+      {/* ── Zona central ────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* Panel azul */}
@@ -189,16 +330,30 @@ export default function ReplayViewer() {
           {team0.map((p, i) => <PlayerCard key={i} player={p} team={0} />)}
         </div>
 
-        {/* Canvas + etiquetas */}
-        <div className="flex-1 relative overflow-hidden">
-          <Viewer3D
-            frames={frames}
-            playing={playing}
-            speed={speed}
-            currentT={currentT}
-            onTimeUpdate={handleTimeUpdate}
-            labelRefs={labelRefs}
-          />
+        {/* Canvas / loading / error */}
+        <div className="flex-1 relative overflow-hidden" style={{ background: '#04090F' }}>
+          {framesErr ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <p className="text-red-400 text-sm font-semibold">⚠ Error cargando frames</p>
+              <p className="text-gray-500 text-xs max-w-sm text-center font-mono">{framesErr}</p>
+            </div>
+          ) : !frames ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-t-rl-blue border-bg-tertiary animate-spin" />
+              <p className="text-gray-400 text-sm">{framesMsg}</p>
+            </div>
+          ) : (
+            <Viewer3D
+              frames={frames}
+              playing={playing}
+              speed={speed}
+              currentT={currentT}
+              onTimeUpdate={handleTimeUpdate}
+              labelRefs={labelRefs}
+            />
+          )}
+
+          {/* Etiquetas HTML sobre coches */}
           {(frames?.players || []).map((p, i) => (
             <div key={i} ref={el => { labelRefs.current[i] = el }}
               className="absolute pointer-events-none"
@@ -224,7 +379,6 @@ export default function ReplayViewer() {
 
       {/* ── Timeline ────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-4 py-2.5" style={{ background: '#030810', borderTop: '1px solid #0A1E35' }}>
-        {/* Barra + marcadores de gol */}
         <div className="relative mb-2.5" style={{ height: 22 }}>
           {goalMarkers.map((g, i) => (
             <button key={i} onClick={() => seekTo(Math.max(0, g.time - 1.5))}
@@ -242,7 +396,6 @@ export default function ReplayViewer() {
             style={{ background: `linear-gradient(to right, #2B6FD4 ${(currentT / safeDuration) * 100}%, #0D2240 0%)` }}
           />
         </div>
-        {/* Controles */}
         <div className="flex items-center gap-3">
           <button onClick={togglePlay}
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
@@ -273,46 +426,10 @@ export default function ReplayViewer() {
   )
 }
 
-// ── Botón Ballchasing ─────────────────────────────────────────────────────────
-function BallchasingButton({ status, url, onClick }) {
-  const isAvailable = url && (status === 'cached' || status === 'uploaded')
-  const isLoading   = status === 'loading'
-  const isNoToken   = status === 'no_token'
-  const isNoFile    = status === 'no_file'
-
-  if (isNoToken || isNoFile) return (
-    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs"
-         style={{ background: '#071829', border: '1px solid #1A3A5C', color: '#3A5A7A' }}
-         title={isNoToken ? 'Añade BALLCHASING_TOKEN en backend/.env' : 'Archivo .replay no disponible'}>
-      <BcIcon /> Ballchasing {isNoToken ? '(sin token)' : '(sin archivo)'}
-    </div>
-  )
-
-  if (isLoading) return (
-    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs animate-pulse"
-         style={{ background: '#071829', border: '1px solid #1A3A5C', color: '#5888B4' }}>
-      <div className="w-3 h-3 rounded-full border border-t-transparent border-rl-blue animate-spin" />
-      Subiendo a Ballchasing…
-    </div>
-  )
-
-  if (isAvailable) return (
-    <button onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all hover:opacity-90"
-      style={{ background: 'linear-gradient(90deg,#1A3F80,#1A4F40)', border: '1px solid #2B6FD466', color: '#90C8FF' }}
-      title="Abrir visor 3D de Ballchasing en el navegador">
-      <BcIcon color="#90C8FF" /> Ver en Ballchasing
-      <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>↗</span>
-    </button>
-  )
-
-  // error o idle
-  return null
-}
-
-function BcIcon({ color = '#5888B4' }) {
+// ── Icono Ballchasing (balón de RL) ───────────────────────────────────────────
+function BcIcon({ size = 14, color = '#5888B4' }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5">
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.4">
       <circle cx="8" cy="8" r="6.5"/>
       <ellipse cx="8" cy="8" rx="3" ry="6.5"/>
       <line x1="1.5" y1="8" x2="14.5" y2="8"/>
@@ -320,7 +437,7 @@ function BcIcon({ color = '#5888B4' }) {
   )
 }
 
-// ── Tarjeta de jugador ────────────────────────────────────────────────────────
+// ── Tarjeta lateral de jugador ────────────────────────────────────────────────
 function PlayerCard({ player, team }) {
   return (
     <div className="rounded-lg px-2.5 py-2"

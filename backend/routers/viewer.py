@@ -88,7 +88,20 @@ def _upload_to_ballchasing(replay_path: str, token: str) -> dict:
     if resp.status_code == 401:
         raise RuntimeError("Token de Ballchasing inválido o caducado")
 
+    if resp.status_code == 429:
+        raise LimitError("Límite de subidas alcanzado en Ballchasing")
+
+    # Algunos planes devuelven 400/403 con mensaje de cuota
+    if resp.status_code in (400, 403):
+        body = resp.text.lower()
+        if any(kw in body for kw in ("quota", "limit", "too many", "exceeded")):
+            raise LimitError("Límite de subidas alcanzado en Ballchasing")
+
     raise RuntimeError(f"Ballchasing HTTP {resp.status_code}: {resp.text[:300]}")
+
+
+class LimitError(RuntimeError):
+    """El usuario ha superado el límite de subidas de Ballchasing."""
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -137,6 +150,9 @@ def get_ballchasing(replay_id: int, db: Session = Depends(get_db)):
         _save_cache(cache)
         logger.info(f"Replay {replay_id} subido a Ballchasing: {result['url']}")
         return {"status": "uploaded", "url": result["url"], "bc_id": result["id"]}
+    except LimitError as e:
+        logger.warning(f"Límite Ballchasing para replay {replay_id}: {e}")
+        return {"status": "limit_exceeded", "url": None, "bc_id": None, "error": str(e)}
     except Exception as e:
         logger.error(f"Error subiendo replay {replay_id} a Ballchasing: {e}")
         return {"status": "error", "url": None, "bc_id": None, "error": str(e)}
