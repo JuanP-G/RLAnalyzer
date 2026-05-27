@@ -1,14 +1,22 @@
 /**
  * ReplayViewer.jsx — Visor 3D de replays.
  *
- * Flujo:
- *   1. Intenta subir el replay a Ballchasing → si ok, muestra botón para abrir su visor 3D.
- *   2. Si falla (sin token / límite / error) → pantalla de aviso + botón "Continuar con visor propio".
- *   3. Solo cuando el usuario elige el visor propio se cargan y procesan los frames (15-30 s).
+ * Flujo en Electron:
+ *   1. Intenta subir el replay a Ballchasing.
+ *   2. Si ok → embebe el visor de Ballchasing directamente via <webview> (sin salir a navegador).
+ *   3. Si falla → pantalla de aviso + "Continuar con visor propio".
+ *   4. Solo al elegir visor propio se cargan los frames Three.js (15-30 s).
+ *
+ * En navegador web (no Electron):
+ *   - Si ok → botón "Ver en Ballchasing ↗" (abre pestaña externa).
+ *   - Si falla → igual que arriba.
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+
+// Detecta si estamos dentro de Electron
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 import { api } from '../api'
 import { getMapName } from '../utils/mapNames'
 import Viewer3D from '../components/Viewer3D'
@@ -58,6 +66,21 @@ export default function ReplayViewer() {
 
   const currentTRef = useRef(0)
   const labelRefs   = useRef([])
+
+  // Webview de Ballchasing (Electron)
+  const webviewRef      = useRef(null)
+  const [bcWebLoading, setBcWebLoading] = useState(true)
+
+  // Cuando bc_ready y Electron: escucha la carga del webview
+  useEffect(() => {
+    if (viewerState !== 'bc_ready' || !isElectron) return
+    setBcWebLoading(true)
+    const wv = webviewRef.current
+    if (!wv) return
+    const onLoad = () => setBcWebLoading(false)
+    wv.addEventListener('did-finish-load', onLoad)
+    return () => wv.removeEventListener('did-finish-load', onLoad)
+  }, [viewerState])
 
   // ── Carga inicial: replay metadata + intento Ballchasing ─────────────────
   useEffect(() => {
@@ -170,54 +193,102 @@ export default function ReplayViewer() {
   )
 
   // ── Estado: Ballchasing listo ─────────────────────────────────────────────
-  if (viewerState === 'bc_ready') return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
-      <TopBar />
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
-        {/* Icono de éxito */}
-        <div className="w-20 h-20 rounded-full flex items-center justify-center"
-             style={{ background: '#0D2240', border: '2px solid #2B6FD455' }}>
-          <BcIcon size={36} color="#90C8FF" />
+  if (viewerState === 'bc_ready') {
+
+    // ── En Electron: webview embebido (sin salir a navegador externo) ─────
+    if (isElectron) return (
+      <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+
+        {/* Barra de control */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2"
+             style={{ background: '#030810', borderBottom: '1px solid #0A1E35' }}>
+          <button onClick={() => navigate(-1)}
+            className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+            ←
+          </button>
+          <span className="flex items-center gap-1.5 text-gray-300 text-sm font-display font-semibold tracking-wide">
+            <BcIcon size={12} color="#6AAEFF" />
+            {replay ? getMapName(replay.map_name) : '—'}
+            <span className="text-gray-600 text-xs font-normal">· Ballchasing</span>
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => window.open(bcUrl, '_blank')}
+              className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              title="Abrir en el navegador del sistema">
+              Abrir en navegador ↗
+            </button>
+            <button onClick={() => setViewerState('our_viewer')}
+              className="px-3 py-1 rounded text-xs font-semibold transition-all hover:text-gray-200"
+              style={{ background: '#071829', border: '1px solid #122A4D', color: '#5888B4' }}>
+              Visor propio
+            </button>
+          </div>
         </div>
 
-        <div className="text-center">
-          <p className="text-gray-100 font-display font-bold text-lg tracking-wide mb-1">
-            Replay disponible en Ballchasing
-          </p>
-          <p className="text-gray-500 text-sm">
-            {bcStatus === 'cached' ? 'Subido anteriormente · cargando desde caché' : 'Subido correctamente'}
-          </p>
+        {/* Webview: Ballchasing embebido */}
+        <div className="flex-1 relative overflow-hidden">
+          {bcWebLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10"
+                 style={{ background: '#04090F' }}>
+              <div className="relative w-14 h-14">
+                <div className="absolute inset-0 rounded-full border-2 border-t-rl-blue border-transparent animate-spin" />
+                <div className="absolute inset-2 flex items-center justify-center">
+                  <BcIcon size={20} color="#2B6FD4" />
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm">Cargando visor de Ballchasing…</p>
+            </div>
+          )}
+          {/* eslint-disable-next-line react/no-unknown-property */}
+          <webview
+            ref={webviewRef}
+            src={bcUrl}
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
         </div>
-
-        {/* Botón principal */}
-        <button
-          onClick={() => window.open(bcUrl, '_blank')}
-          className="flex items-center gap-3 px-8 py-4 rounded-xl font-semibold text-base transition-all hover:scale-[1.03]"
-          style={{
-            background: 'linear-gradient(135deg, #1A3F80, #0E2850)',
-            border: '1px solid #3A8EFF55',
-            color: '#90C8FF',
-            boxShadow: '0 0 32px #2B6FD422',
-          }}>
-          <BcIcon size={20} color="#90C8FF" />
-          Ver en Ballchasing
-          <span className="text-lg opacity-70">↗</span>
-        </button>
-
-        <p className="text-gray-600 text-xs text-center max-w-xs">
-          Se abrirá el visor 3D oficial de ballchasing.com en tu navegador.
-        </p>
-
-        {/* Fallback discreto */}
-        <button
-          onClick={() => setViewerState('our_viewer')}
-          className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
-          style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-          Usar visor propio de RLAnalyzer →
-        </button>
       </div>
-    </div>
-  )
+    )
+
+    // ── En navegador web: botón que abre pestaña externa ─────────────────
+    return (
+      <div className="h-full flex flex-col overflow-hidden" style={{ background: '#04090F' }}>
+        <TopBar />
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center"
+               style={{ background: '#0D2240', border: '2px solid #2B6FD455' }}>
+            <BcIcon size={36} color="#90C8FF" />
+          </div>
+          <div className="text-center">
+            <p className="text-gray-100 font-display font-bold text-lg tracking-wide mb-1">
+              Replay disponible en Ballchasing
+            </p>
+            <p className="text-gray-500 text-sm">
+              {bcStatus === 'cached' ? 'Subido anteriormente' : 'Subido correctamente'}
+            </p>
+          </div>
+          <button
+            onClick={() => window.open(bcUrl, '_blank')}
+            className="flex items-center gap-3 px-8 py-4 rounded-xl font-semibold text-base transition-all hover:scale-[1.03]"
+            style={{
+              background: 'linear-gradient(135deg, #1A3F80, #0E2850)',
+              border: '1px solid #3A8EFF55',
+              color: '#90C8FF',
+              boxShadow: '0 0 32px #2B6FD422',
+            }}>
+            <BcIcon size={20} color="#90C8FF" />
+            Ver en Ballchasing ↗
+          </button>
+          <button onClick={() => setViewerState('our_viewer')}
+            className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+            Usar visor propio →
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Estado: Ballchasing no disponible ────────────────────────────────────
   if (viewerState === 'bc_failed') return (

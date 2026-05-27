@@ -96,6 +96,7 @@ async function createWindow() {
       nodeIntegration:  false,
       contextIsolation: true,
       preload:          path.join(__dirname, 'preload.js'),
+      webviewTag:       true,   // permite usar <webview> para embeber sitios externos
     },
   })
 
