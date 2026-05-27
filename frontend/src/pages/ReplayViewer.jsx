@@ -68,47 +68,39 @@ export default function ReplayViewer() {
   const labelRefs   = useRef([])
 
   // Webview de Ballchasing (Electron)
-  const webviewRef      = useRef(null)
+  const webviewRef    = useRef(null)
+  const wvContainerRef = useRef(null)
   const [bcWebLoading, setBcWebLoading] = useState(true)
 
   // URL de Ballchasing con el hash #watch para ir directo al visor 3D
   const bcWatchUrl = bcUrl ? `${bcUrl.split('#')[0]}#watch` : null
 
-  // CSS que se inyecta en el webview para ocultar el chrome de Ballchasing
-  // y que el visor 3D ocupe toda la pantalla
-  const BC_INJECT_CSS = `
-    /* Ocultar navbar, header y barra de tabs de navegación */
-    nav, header,
-    [class*="navbar"], [class*="nav-bar"],
-    [class*="header"], [class*="topbar"],
-    [class*="tab-nav"], [class*="tabs-nav"],
-    [role="navigation"], [role="banner"] {
-      display: none !important;
-    }
-    /* Quitar padding-top del body que compensa el nav sticky */
-    body, html {
-      padding-top: 0 !important;
-      margin-top:  0 !important;
-      overflow-x: hidden;
-    }
-    /* Ocultar botón de soporte/donación */
-    [class*="support"], [class*="patron"], [class*="donate"],
-    [class*="banner"], [class*="alert"] {
-      display: none !important;
-    }
-    /* La sección #watch llena el alto disponible */
-    #watch {
-      min-height: 100vh;
-      padding-top: 0 !important;
-    }
-    /* Hacer que el canvas sea responsivo */
-    #watch canvas {
-      max-width: 100% !important;
-    }
-  `
+  // ResizeObserver: sincroniza píxeles exactos del contenedor al webview.
+  // height:100% / inset:0 no funcionan de forma fiable en <webview> de Electron
+  // cuando la altura viene de una cadena flex. Píxeles explícitos son la única
+  // solución robusta.
+  useEffect(() => {
+    if (viewerState !== 'bc_ready' || !isElectron) return
+    const container = wvContainerRef.current
+    const wv        = webviewRef.current
+    if (!container || !wv) return
 
-  // Cuando bc_ready y Electron: espera la carga del webview,
-  // inyecta CSS de limpieza y desplaza al visor 3D
+    const sync = () => {
+      const { width, height } = container.getBoundingClientRect()
+      if (width > 0 && height > 0) {
+        wv.style.width  = `${width}px`
+        wv.style.height = `${height}px`
+      }
+    }
+
+    sync()
+    const ro = new ResizeObserver(sync)
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [viewerState])
+
+  // Cuando la página de Ballchasing termine de cargar: ocultar el banner de
+  // donación (única inyección CSS) y hacer scroll a la sección #watch
   useEffect(() => {
     if (viewerState !== 'bc_ready' || !isElectron) return
     setBcWebLoading(true)
@@ -117,9 +109,13 @@ export default function ReplayViewer() {
 
     const onLoad = async () => {
       try {
-        // Inyectar CSS para ocultar el chrome de Ballchasing
-        await wv.insertCSS(BC_INJECT_CSS)
-        // Desplazar al elemento #watch por si el hash no fue suficiente
+        // Solo ocultar el banner de donación, nada más (evita romper el layout)
+        await wv.insertCSS(`
+          [class*="support"], [class*="patron"], [class*="donate"] {
+            display: none !important;
+          }
+        `)
+        // Scroll al visor 3D
         await wv.executeJavaScript(`
           (() => {
             const el = document.getElementById('watch');
@@ -282,41 +278,31 @@ export default function ReplayViewer() {
           </div>
         </div>
 
-        {/* Webview: Ballchasing embebido
-            IMPORTANTE: el <webview> de Electron no hereda altura de flex-1 con height:100%.
-            La solución es un contenedor con position:relative + inset:0 absoluto en el webview. */}
-        <div className="flex-1" style={{ position: 'relative', minHeight: 0 }}>
+        {/* Webview: Ballchasing embebido.
+            wvContainerRef mide el espacio real en px y se lo pasa al webview via ResizeObserver.
+            height:100% / inset:0 no son fiables en <webview> de Electron — píxeles explícitos sí. */}
+        <div
+          ref={wvContainerRef}
+          className="flex-1"
+          style={{ position: 'relative', overflow: 'hidden', minHeight: 0 }}
+        >
           {bcWebLoading && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 16, background: '#04090F', zIndex: 10,
-            }}>
-              <div style={{ position: 'relative', width: 56, height: 56 }}>
-                <div style={{
-                  position: 'absolute', inset: 0, borderRadius: '50%',
-                  border: '2px solid transparent', borderTopColor: '#00A8FF',
-                  animation: 'spin 0.9s linear infinite',
-                }} />
-                <div style={{
-                  position: 'absolute', inset: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10"
+                 style={{ background: '#04090F' }}>
+              <div className="relative w-14 h-14">
+                <div className="absolute inset-0 rounded-full border-2 border-t-rl-blue border-transparent animate-spin" />
+                <div className="absolute inset-2 flex items-center justify-center">
                   <BcIcon size={20} color="#2B6FD4" />
                 </div>
               </div>
-              <p style={{ color: '#6A90BC', fontSize: 14 }}>Cargando visor de Ballchasing…</p>
+              <p className="text-gray-400 text-sm">Cargando visor de Ballchasing…</p>
             </div>
           )}
           {/* eslint-disable-next-line react/no-unknown-property */}
           <webview
             ref={webviewRef}
             src={bcWatchUrl}
-            style={{
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              width: '100%', height: '100%',
-              display: 'block',
-            }}
+            style={{ display: 'block' }}
             allowpopups=""
           />
         </div>
