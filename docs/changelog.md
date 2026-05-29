@@ -5,6 +5,31 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.3.1] — 2026-05-29
+
+### Añadido
+- **Sección Comparar** (`frontend/src/pages/Compare.jsx`, ruta `/compare`, link en `Sidebar.jsx`)
+  - Compara **dos partidas (A vs B)** mostrando tres roles: **tus** stats, el **agregado de tu equipo** y el del **equipo rival**
+  - Columna de **delta (A−B) coloreada** verde/rojo según `higher_better` de cada métrica (gris si neutral o falta dato)
+  - Panel automático **"qué hiciste distinto"** que destaca las métricas con mayor diferencia relevante
+  - Tabla por grupos (Ofensiva/Defensa/Boost/Movimiento) con todas las métricas del glosario
+  - Dos accesos: selectores propios en la sección + modo **"Comparar"** en la lista de Partidas (elegir 2 → `/compare?a=&b=`)
+  - Lógica pura en `frontend/src/utils/compareStats.js` (suma para recuentos, media para `avg_boost`/`avg_speed`, `shooting_pct` derivado). **Sin cambios de backend**: reutiliza `GET /api/replays/{id}` y `GET /api/stats/glossary`
+  - Avisos para partida repetida y para tamaños de equipo distintos (los totales de equipo no son directamente comparables)
+
+### Corregido / mejorado
+- **Legibilidad de gráficos del Dashboard**: el tooltip de la tarta "Estilo de juego" usaba texto oscuro ilegible sobre fondo oscuro; ahora usa texto claro (`itemStyle`/`labelStyle`)
+- **Indicador de partida anómala** en "Últimas partidas" del Dashboard (badge ⚠ con tooltip explicando rendición corta o paliza)
+- **Botón "3D"** en cada partida reciente del Dashboard, reutilizando el estilo del botón de la lista de Partidas
+- **Ayuda contextual** (`frontend/src/components/AbnormalHelp.jsx`): icono "?" junto a "Excluir anómalas" en Dashboard y Análisis, con tooltip que explica los umbrales
+- **Umbral de duración** de partida anómala reducido de **240s → 180s** (`DEFAULT_MIN_DURATION` en `stats.py`, estado de `Analysis.jsx` y docs)
+
+### Documentación
+- `README.md`, `docs/architecture.md`, `docs/api-reference.md`, `docs/changelog.md`, `docs/roadmap.md` actualizados con la sección Comparar y los retoques del Dashboard
+- Documentos Word (`RLAnalyzer-Documentacion-Tecnica.docx`, `RLAnalyzer-Plan-de-Proyecto.docx`) actualizados
+
+---
+
 ## [0.3.0] — 2026-05-29
 
 ### Añadido
