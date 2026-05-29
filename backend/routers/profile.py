@@ -494,9 +494,12 @@ def debug_profile_stats():
         results.append({
             "playlist": name,
             "stat_keys": list(stats.keys()),
-            "divisionDown_raw": stats.get("divisionDown"),
-            "divisionUp_raw":   stats.get("divisionUp"),
-            "rating_raw":       stats.get("rating", {}).get("value"),
+            "divisionDown_raw":   stats.get("divisionDown"),
+            "divisionUp_raw":     stats.get("divisionUp"),
+            "division_metadata":  (stats.get("division", {}) or {}).get("metadata"),
+            "rank_raw":           stats.get("rank"),
+            "percentile_raw":     stats.get("percentile"),
+            "rating_raw":         stats.get("rating", {}).get("value"),
         })
     return {"playlists": results}
 
@@ -642,6 +645,14 @@ def _s(d, *keys, default=None):
         return default
 
 
+def _first(*vals):
+    """Primer valor que no sea None (0 es válido)."""
+    for v in vals:
+        if v is not None:
+            return v
+    return None
+
+
 def _parse(raw):
     d    = raw.get("data", {})
     pi   = d.get("platformInfo", {})
@@ -684,10 +695,19 @@ def _parse(raw):
             "wins":          _s(stats, "wins",          "value"),
             "winPct":        _s(stats, "winPercentage", "displayValue"),
             "winPctVal":     _s(stats, "winPercentage", "value"),
-            "divisionDown":  _s(stats, "divisionDown",  "value"),
-            "divisionUp":    _s(stats, "divisionUp",    "value"),
-            "globalRank":    _s(stats, "rank",          "value"),
-            "percentile":    _s(stats, "percentile",    "value"),
+            # MMR para bajar/subir de división: tracker.gg lo expone en
+            # division.metadata.deltaDown/deltaUp; algunas respuestas usan stats.divisionDown/Up.value
+            "divisionDown":  _first(_s(stats, "divisionDown", "value"), _s(div, "metadata", "deltaDown")),
+            "divisionUp":    _first(_s(stats, "divisionUp",   "value"), _s(div, "metadata", "deltaUp")),
+            "globalRank":    _first(_s(stats, "rank", "value"), _s(stats, "rank", "metadata", "rank")),
+            # Percentil "Top X%": distintas respuestas lo ponen en sitios distintos
+            "percentile":    _first(
+                _s(stats, "percentile", "value"),
+                _s(stats, "rank", "percentile"),
+                _s(stats, "rank", "metadata", "percentile"),
+                _s(tier, "metadata", "percentile"),
+                _s(div,  "metadata", "percentile"),
+            ),
         })
 
     current = sorted(

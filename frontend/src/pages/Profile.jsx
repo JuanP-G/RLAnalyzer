@@ -62,13 +62,6 @@ function timeAgo(isoStr) {
   return `hace ${Math.floor(diff / 86400)} días`
 }
 
-function winRate(pl) {
-  if (pl.winPct) return pl.winPct
-  if (pl.wins != null && pl.matchesPlayed)
-    return `${((pl.wins / pl.matchesPlayed) * 100).toFixed(1)}%`
-  return null
-}
-
 // ── RankIcon: local SVG con fallback a URL remota ─────────────────────────────
 function RankIcon({ tierValue, tierIconUrl, tierName, size = 72 }) {
   const [useFallback, setUseFallback] = useState(false)
@@ -146,7 +139,6 @@ function ErrorBox({ error, onRetry }) {
 // ── RankCard ─────────────────────────────────────────────────────────────────
 function RankCard({ playlist, index }) {
   const meta    = PLAYLIST_META[playlist.playlistId] || { label: playlist.name, color: '#7B91B0' }
-  const wr      = winRate(playlist)
   const dDown   = playlist.divisionDown
   const dUp     = playlist.divisionUp
   const hasProg = dDown != null && dUp != null && (dDown + dUp) > 0
@@ -242,21 +234,34 @@ function RankCard({ playlist, index }) {
       )}
 
       {/* Stats inferiores */}
-      <div className="grid grid-cols-4 px-3 py-2.5 mt-auto" style={{ borderTop: '1px solid #0D2240' }}>
-        {[
+      {(() => {
+        const pct = playlist.percentile
+        // "Top X%": dorado siempre; con brillo extra cuando estás en un top destacado (≤ 10%)
+        const topStrong = pct != null && pct <= 10
+        const topStyle = pct == null
+          ? { color: '#C2D6F5' }
+          : { color: topStrong ? '#FFC93C' : '#E0A82E',
+              textShadow: topStrong ? '0 0 8px rgba(255,184,0,0.6)' : 'none' }
+        const rank = playlist.globalRank
+        const cells = [
           { label: 'Partidas', value: playlist.matchesPlayed },
-          { label: 'Win %',    value: wr },
-          { label: 'Top',      value: playlist.percentile != null ? `${playlist.percentile.toFixed(1)}%` : null },
+          { label: 'Rank',     value: rank != null ? `#${Math.round(rank).toLocaleString('es-ES')}` : null },
+          { label: 'Top',      value: pct != null ? `${pct.toFixed(1)}%` : null, style: topStyle },
           { label: 'Racha',    value: streakStr, style: streakStr ? { color: streakColor } : undefined },
-        ].map(({ label, value, style }) => (
-          <div key={label} className="text-center">
-            <p className="text-gray-500 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
-            <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#C2D6F5' }}>
-              {value ?? '—'}
-            </p>
+        ]
+        return (
+          <div className="grid grid-cols-4 px-3 py-2.5 mt-auto" style={{ borderTop: '1px solid #0D2240' }}>
+            {cells.map(({ label, value, style }) => (
+              <div key={label} className="text-center">
+                <p className="text-gray-500 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
+                <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#C2D6F5' }}>
+                  {value ?? '—'}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
     </div>
   )
 }
