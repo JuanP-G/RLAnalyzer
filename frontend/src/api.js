@@ -31,10 +31,41 @@ export async function invalidateProfileCache() {
   await fetch(`${BASE}/profile/invalidate`, { method: 'POST' }).catch(() => {})
 }
 
+// Construye el query string compartido por /stats/analysis y /stats/trend
+function _statsQuery(f = {}) {
+  const p = new URLSearchParams()
+  if (f.team_size != null)     p.set('team_size', f.team_size)
+  if (f.category)              p.set('category',  f.category)
+  if (f.date_from)             p.set('date_from', f.date_from)
+  if (f.date_to)               p.set('date_to',   f.date_to)
+  if (f.bucket)                p.set('bucket',    f.bucket)
+  if (f.exclude_abnormal === false) p.set('exclude_abnormal', 'false')
+  if (f.min_duration != null)  p.set('min_duration',  f.min_duration)
+  if (f.max_goal_diff != null) p.set('max_goal_diff', f.max_goal_diff)
+  const qs = p.toString()
+  return qs ? `?${qs}` : ''
+}
+
 export const api = {
   status:         ()                     => fetchJSON(`${BASE}/status`),
   summary:        ()                     => fetchJSON(`${BASE}/stats/summary`),
   myStats:        ()                     => fetchJSON(`${BASE}/stats/me`),
+  analysisFilters:()                     => fetchJSON(`${BASE}/stats/analysis/filters`),
+  glossary:       ()                     => fetchJSON(`${BASE}/stats/glossary`),
+  analysis:       (filters = {})         => fetchJSON(`${BASE}/stats/analysis${_statsQuery(filters)}`),
+  trend:          (filters = {})         => fetchJSON(`${BASE}/stats/trend${_statsQuery(filters)}`),
+  dashboard:      (filters = {}) => {
+    const p = new URLSearchParams()
+    if (filters.team_size != null)        p.set('team_size', filters.team_size)
+    if (filters.result)                   p.set('result',    filters.result)
+    if (filters.date_from)                p.set('date_from', filters.date_from)
+    if (filters.bucket)                   p.set('bucket',    filters.bucket)
+    if (filters.exclude_abnormal === false) p.set('exclude_abnormal', 'false')
+    if (filters.min_duration != null)     p.set('min_duration',  filters.min_duration)
+    if (filters.max_goal_diff != null)    p.set('max_goal_diff', filters.max_goal_diff)
+    const qs = p.toString()
+    return fetchJSON(`${BASE}/stats/dashboard${qs ? `?${qs}` : ''}`)
+  },
   replays:        (skip = 0, limit = 50, filters = {}) => {
     const p = new URLSearchParams({ skip, limit })
     if (filters.result)        p.set('result',        filters.result)

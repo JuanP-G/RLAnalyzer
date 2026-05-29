@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog } = require('electron')
 const fs = require('fs')
 const { spawn }                      = require('child_process')
 const path                           = require('path')
@@ -9,6 +9,7 @@ const ROOT = path.join(__dirname, '..')
 let mainWindow
 let backendProc
 let frontendProc
+let bcView = null        // WebContentsView que embebe la web de Ballchasing (visor 3D)
 
 // ── Espera a que un servidor HTTP responda ────────────────────────────────────
 function waitForServer(url, timeoutMs = 45000) {
@@ -74,8 +75,17 @@ async function startFrontend() {
   frontendProc.stderr.on('data', d => console.error('[frontend]', d.toString().trim()))
 }
 
+// ── Destruye la vista embebida de Ballchasing ────────────────────────────────
+function destroyBcView() {
+  if (!bcView) return
+  try { mainWindow?.contentView.removeChildView(bcView) } catch (_) {}
+  try { bcView.webContents.close() } catch (_) {}
+  bcView = null
+}
+
 // ── Mata todos los procesos hijo ──────────────────────────────────────────────
 function killAll() {
+  destroyBcView()
   try { if (backendProc)  backendProc.kill()  } catch (_) {}
   try { if (frontendProc) frontendProc.kill() } catch (_) {}
 }
@@ -208,6 +218,51 @@ ipcMain.handle('replay:export', async (_event, filePath) => {
   } catch (err) {
     return { ok: false, error: err.message }
   }
+})
+
+// ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
+// Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de
+// render de Chromium que la ventana principal (WebGL/GPU real), de modo que el
+// visor 3D de Ballchasing se renderiza correctamente, como un navegador metido
+// dentro de la app.
+function roundBounds(b) {
+  return {
+    x:      Math.round(b?.x ?? 0),
+    y:      Math.round(b?.y ?? 0),
+    width:  Math.max(0, Math.round(b?.width  ?? 0)),
+    height: Math.max(0, Math.round(b?.height ?? 0)),
+  }
+}
+
+ipcMain.handle('bcview:open', (_event, url, bounds) => {
+  if (!mainWindow) return { ok: false, error: 'No window' }
+  // Si ya existe, solo navegamos y reposicionamos
+  if (!bcView) {
+    bcView = new WebContentsView({
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    })
+    bcView.setBackgroundColor('#04090F')
+    mainWindow.contentView.addChildView(bcView)
+    // Los popups/links externos se abren en el navegador del sistema
+    bcView.webContents.setWindowOpenHandler(({ url }) => {
+      shell.openExternal(url)
+      return { action: 'deny' }
+    })
+  }
+  bcView.setBounds(roundBounds(bounds))
+  if (url) bcView.webContents.loadURL(url)
+  return { ok: true }
+})
+
+ipcMain.handle('bcview:setBounds', (_event, bounds) => {
+  if (!bcView) return { ok: false }
+  bcView.setBounds(roundBounds(bounds))
+  return { ok: true }
+})
+
+ipcMain.handle('bcview:close', () => {
+  destroyBcView()
+  return { ok: true }
 })
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────

@@ -218,6 +218,184 @@ Medias detalladas del jugador principal: overall, solo victorias, solo derrotas.
 
 ---
 
+### `GET /api/stats/dashboard`
+
+Datos personales para el **Dashboard**, segmentables por modo, periodo y resultado.
+
+**Query params:**
+
+| Param | Tipo | Descripción |
+|-------|------|-------------|
+| `team_size` | int | Filtrar por modo: `1`, `2` o `3` |
+| `result` | string | `win` \| `loss` — afecta KPIs/tarta/tiros, **no** la forma reciente |
+| `date_from` / `date_to` | string | Rango de fechas (`YYYY-MM-DD`) |
+| `bucket` | string | Agrupación de la serie: `day` (default) \| `week` |
+| `exclude_abnormal` | bool | Excluir partidas anómalas de las medias (default `true`) |
+| `min_duration` | int | Umbral de rendición en segundos (default 240) |
+| `max_goal_diff` | int | Umbral de paliza por diferencia de goles (default 5) |
+
+**Respuesta (resumida):**
+```json
+{
+  "filters": { "team_size": 2, "result": null, "bucket": "day", "exclude_abnormal": true },
+  "kpis": { "games": 130, "wins": 79, "losses": 51, "win_rate": 60.8,
+            "analyzed_games": 109, "avg_goals": 1.46, "avg_saves": 1.18, "avg_score": 412.5 },
+  "play_style": { "goals": 190, "saves": 153, "assists": 94 },
+  "shooting": { "goals": 190, "shots": 460, "pct": 41.3 },
+  "bucket": "day",
+  "series": [
+    { "date": "2026-05-12T00:00:00", "label": "12/05", "goals": 8, "shots": 19,
+      "saves": 6, "assists": 4, "games": 5, "wins": 3, "shooting_pct": 42.1 }
+  ],
+  "recent_form": {
+    "matches": [ { "id": 116, "result": "win", "map_name": "DFH Stadium",
+                   "team0_score": 3, "team1_score": 1, "played_at": "2026-05-25T21:14:00" } ],
+    "wins": 9, "total": 15, "win_rate": 60.0
+  }
+}
+```
+
+> `recent_form` siempre devuelve las últimas 15 partidas (ordenadas cronológicamente, la más reciente al final) y **ignora** el filtro `result`. El win rate y el recuento de partidas usan todas las partidas; las medias excluyen las anómalas.
+
+---
+
+### `GET /api/stats/analysis/filters`
+
+Opciones disponibles para los desplegables de filtro de la sección Análisis, con nº de partidas por cada valor.
+
+**Respuesta:**
+```json
+{
+  "team_sizes": [ { "value": 1, "games": 12 }, { "value": 2, "games": 98 }, { "value": 3, "games": 32 } ],
+  "categories": [ { "value": "Ranked", "games": 110 }, { "value": "Casual", "games": 32 } ],
+  "total": 142,
+  "date_min": "2026-01-04T18:22:00",
+  "date_max": "2026-05-25T21:14:00",
+  "defaults": { "min_duration": 240, "max_goal_diff": 5 }
+}
+```
+
+> ⚠️ `team_sizes` y `categories` son arrays de **objetos** `{value, games}`, no valores planos. Los consumidores deben usar `.value`.
+
+---
+
+### `GET /api/stats/analysis`
+
+Comparativa de medias (global / victorias / derrotas) tuyas, de tus compañeros y de tus rivales, métrica a métrica, para el set de partidas filtrado.
+
+**Query params:** `team_size`, `category`, `date_from`, `date_to`, `exclude_abnormal` (default `true`), `min_duration` (240), `max_goal_diff` (5).
+
+**Respuesta (resumida):**
+```json
+{
+  "games": 130, "wins": 79, "losses": 51, "win_rate": 60.8,
+  "analyzed_games": 109, "excluded_abnormal": 21,
+  "filters": { "team_size": 2, "category": null, "exclude_abnormal": true },
+  "metrics": [
+    {
+      "key": "saves", "label": "Paradas", "group": "defense",
+      "higher_better": true, "unit": "", "desc": "...", "source": "Cabecera del replay",
+      "me":        { "overall": 1.18, "wins": 1.02, "losses": 1.41 },
+      "teammates": { "overall": 1.10, "wins": 0.98, "losses": 1.30 },
+      "opponents": { "overall": 1.25, "wins": 1.39, "losses": 1.05 }
+    }
+  ]
+}
+```
+
+> El win rate usa todas las partidas; las medias por métrica excluyen las anómalas cuando `exclude_abnormal=true`.
+
+---
+
+### `GET /api/stats/trend`
+
+Evolución temporal: agrupa las partidas por semana o mes y devuelve, por periodo, el win rate y la media de cada métrica.
+
+**Query params:** mismos filtros que `/analysis`, más `bucket` = `week` (default) \| `month`.
+
+**Respuesta (resumida):**
+```json
+{
+  "bucket": "week",
+  "buckets": [
+    { "period": "2026-05-12T00:00:00", "label": "12/05", "games": 14, "wins": 9,
+      "win_rate": 64.3, "metrics": { "goals": 1.5, "saves": 1.1, "...": null } }
+  ],
+  "metric_meta": [ { "key": "goals", "label": "Goles", "group": "offense", "unit": "" } ]
+}
+```
+
+---
+
+### `GET /api/stats/glossary`
+
+Descripción y origen de cada métrica disponible, más la definición de partida anómala. Usado por la sección de ayuda de la UI.
+
+**Respuesta:**
+```json
+{
+  "abnormal": { "min_duration": 240, "max_goal_diff": 5, "desc": "..." },
+  "metrics": [
+    { "key": "avg_boost", "label": "Boost medio", "group": "boost", "unit": "",
+      "higher_better": true, "desc": "...", "source": "Stats avanzadas (subtr-actor)" }
+  ]
+}
+```
+
+---
+
+## Jugadores
+
+### `GET /api/players`
+
+Lista de todos los jugadores vistos en tus replays (excluye el jugador principal), ordenados por nº de apariciones. Acepta `?q=` para filtrar por nombre.
+
+**Respuesta:**
+```json
+{ "players": [ { "name": "ldz150", "games": 42, "last_seen": "2026-05-25T21:14:00" } ] }
+```
+
+---
+
+### `GET /api/players/{player_name}/summary`
+
+Récord completo con/contra un jugador: partidas juntos vs contra, win rate en cada caso y medias comparadas de tus stats y las suyas.
+
+**Respuesta (resumida):**
+```json
+{
+  "player_name": "ldz150", "total_games": 42,
+  "first_seen": "...", "last_seen": "...",
+  "with":    { "games": 30, "wins": 19, "losses": 11, "win_rate": 63.3, "my_avg": {...}, "their_avg": {...} },
+  "against": { "games": 12, "wins": 5,  "losses": 7,  "win_rate": 41.7, "my_avg": {...}, "their_avg": {...} }
+}
+```
+
+---
+
+### `GET /api/players/{player_name}/replays`
+
+Lista de replays donde aparece el jugador. `?context=with` (juntos) \| `against` (contra), con `skip`/`limit`.
+
+**Respuesta:** `{ "total": int, "replays": [ { ...replay, "context", "their_stats", "my_stats" } ] }`
+
+---
+
+## Ballchasing
+
+### `GET /api/replays/{replay_id}/ballchasing`
+
+Devuelve la URL del visor de Ballchasing para el replay. Si no está en caché, intenta subirlo (requiere `BALLCHASING_TOKEN` en `backend/.env`).
+
+**Respuesta:**
+```json
+{ "status": "cached", "url": "https://ballchasing.com/replay/...", "bc_id": "..." }
+```
+
+**Posibles `status`:** `cached` · `uploaded` · `no_file` (sin `.replay` local) · `no_token` · `limit_exceeded` · `error`.
+
+---
+
 ## Perfil
 
 ### `GET /api/profile`

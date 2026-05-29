@@ -44,11 +44,22 @@ function IconViewer3D() {
     </svg>
   )
 }
+function IconAnalysis() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 14.5h13" opacity="0.7" />
+      <rect x="2.5" y="8"  width="2.6" height="5" rx="0.6" fill="currentColor" stroke="none" opacity="0.55" />
+      <rect x="6.7" y="4.5" width="2.6" height="8.5" rx="0.6" fill="currentColor" stroke="none" opacity="0.8" />
+      <rect x="10.9" y="6.5" width="2.6" height="6.5" rx="0.6" fill="currentColor" stroke="none" opacity="0.65" />
+    </svg>
+  )
+}
 const links = [
-  { to: '/profile', label: 'Mi Perfil',  Icon: IconProfile },
-  { to: '/',        label: 'Dashboard',  Icon: IconDashboard },
-  { to: '/replays', label: 'Partidas',   Icon: IconReplays },
-  { to: '/viewer',  label: 'Visor 3D',   Icon: IconViewer3D },
+  { to: '/profile',  label: 'Mi Perfil',  Icon: IconProfile },
+  { to: '/',         label: 'Dashboard',  Icon: IconDashboard },
+  { to: '/replays',  label: 'Partidas',   Icon: IconReplays },
+  { to: '/analysis', label: 'Análisis',   Icon: IconAnalysis },
+  { to: '/viewer',   label: 'Visor 3D',   Icon: IconViewer3D },
 ]
 
 export default function Sidebar({ playerName, folderOk }) {

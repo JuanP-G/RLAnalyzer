@@ -5,6 +5,45 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.3.0] — 2026-05-29
+
+### Añadido
+- **Sección Análisis** (`frontend/src/pages/Analysis.jsx`, ruta `/analysis`, link en `Sidebar.jsx`)
+  - Comparativa de tus medias en **victorias vs derrotas**, métrica a métrica
+  - Comparativa frente a **compañeros** y **rivales** del mismo set de partidas
+  - Drill-down **"¿Por qué?"**: al expandir una métrica se muestran las métricas relacionadas que explican la diferencia, por actor (yo/compañeros/rivales)
+  - Filtros por modo, categoría y fechas; exclusión de partidas anómalas configurable
+- **Router de estadísticas** (`backend/routers/stats.py`) registrado en `main.py`
+  - `GET /api/stats/analysis` — medias global/victorias/derrotas por métrica y rol
+  - `GET /api/stats/trend` — evolución temporal por semana/mes
+  - `GET /api/stats/dashboard` — datos personales para el Dashboard
+  - `GET /api/stats/analysis/filters` — opciones de filtro con nº de partidas
+  - `GET /api/stats/glossary` — descripción y origen de cada métrica
+  - Tabla central `METRICS` (offense/defense/boost/movement) con derivadas como `shooting_pct`
+  - Detección de partidas anómalas (rendiciones cortas / palizas) que afectan a las medias pero no al win rate
+- **Dashboard rediseñado** (`frontend/src/pages/Dashboard.jsx`) estilo RL Tracker
+  - Gráficos: **Estilo de juego** (tarta goles/paradas/asistencias), **Tiros: goles vs tiros** (barras + línea de % de acierto con media móvil), **Forma reciente** (cuadros V/D)
+  - Filtros: modo (1v1/2v2/3v3), periodo (todo / 7 / 30 / 90 días), resultado (V/D), excluir anómalas
+  - Agrupación seleccionable por día o semana
+  - Tabla de partidas recientes compacta
+- **Visor embebido de Ballchasing** (`electron/main.js`, `preload.js`, `ReplayViewer.jsx`)
+  - `WebContentsView` adjunto a la ventana principal (WebGL/GPU real) posicionado sobre la zona del visor
+  - IPC `bcViewOpen / bcViewSetBounds / bcViewClose`; popups externos al navegador del sistema
+  - `GET /api/replays/{id}/ballchasing` (`routers/viewer.py`) — sube el replay y devuelve la URL, con caché en `data/ballchasing_cache.json`
+- **Historial por jugador** (`routers/players.py`, `PlayerHistory.jsx`)
+  - `GET /api/players`, `/api/players/{name}/summary`, `/api/players/{name}/replays`
+
+### Corregido
+- **Dashboard en blanco**: el filtro de Modo trataba `team_sizes` (que `/api/stats/analysis/filters` devuelve como objetos `{value, games}`) como números, lo que lanzaba "Objects are not valid as a React child" y desmontaba todo el árbol de React. Corregido usando `ts.value` en `key`, `active` y el texto del pill.
+
+### Documentación
+- `README.md`: sección Dashboard y Análisis, características y estructura actualizadas
+- `docs/api-reference.md`: endpoints de Stats, Jugadores y Ballchasing
+- `docs/architecture.md`: rutas frontend, módulos backend, motor de análisis, visor embebido (v0.3.0)
+- `docs/changelog.md`: esta entrada
+
+---
+
 ## [Unreleased] — 2026-05-26 (actualizado)
 
 ### Añadido

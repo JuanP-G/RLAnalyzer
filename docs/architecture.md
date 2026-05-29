@@ -1,6 +1,6 @@
 # Arquitectura Técnica — RLAnalyzer
 
-> Versión: 0.2.0 — Actualizado: 2026-05-26
+> Versión: 0.3.0 — Actualizado: 2026-05-29
 
 ---
 
@@ -46,9 +46,13 @@ Shell de escritorio. Responsabilidades:
   - `minimize / maximize / close / isMaximized / onMaximizeChange`
   - `showReplayInFolder(path)` — abre el explorador con el `.replay` seleccionado
   - `exportReplay(path)` — copia el archivo a una ruta elegida por el usuario
+  - `bcViewOpen(url, bounds) / bcViewSetBounds(bounds) / bcViewClose()` — controla un `WebContentsView` que embebe el visor de Ballchasing
+
+**Visor embebido de Ballchasing (`WebContentsView`):**
+El visor 3D de Ballchasing necesita WebGL/GPU real, que un `<webview>` no garantiza. Por eso se usa un `WebContentsView` adjunto a la ventana principal (misma ruta de render de Chromium), posicionado sobre la zona del visor de React mediante `setBounds`. Los popups/enlaces externos se abren en el navegador del sistema. La vista se destruye al cerrar el visor o la app.
 
 **Archivos clave:**
-- `electron/main.js` — ventana + procesos hijo + IPC handlers
+- `electron/main.js` — ventana + procesos hijo + IPC handlers + `WebContentsView`
 - `electron/preload.js` — bridge seguro `contextBridge.exposeInMainWorld("electronAPI", …)`
 
 ### 2. Frontend (`frontend/`)
@@ -59,11 +63,14 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 
 | Ruta | Componente | Descripción |
 |------|------------|-------------|
-| `/` | `Dashboard.jsx` | KPIs, últimas partidas, win rate |
+| `/` | `Dashboard.jsx` | KPIs, gráficos personales (tarta, tiros, forma) y filtros |
+| `/analysis` | `Analysis.jsx` | Comparativa V/D vs compañeros/rivales + drill-down "¿Por qué?" |
 | `/replays` | `ReplayList.jsx` | Lista paginada con filtros |
 | `/replays/:id` | `ReplayDetail.jsx` | Detalle de una partida, comparativa |
-| `/replays/:id/viewer` | `ReplayViewer.jsx` | Visor 3D Three.js |
+| `/viewer` | `ViewerList.jsx` | Listado de replays para abrir en el visor |
+| `/viewer/:id` | `ReplayViewer.jsx` | Visor 3D Three.js + visor embebido de Ballchasing |
 | `/profile` | `Profile.jsx` | Rangos, MMR, historial tracker.gg |
+| `/players/:name` | `PlayerHistory.jsx` | Récord con/contra un jugador |
 
 **Cliente HTTP (`api.js`):** caché en memoria por URL con TTL 60s. Todas las peticiones van a `http://localhost:8000`.
 
@@ -95,7 +102,10 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 | `parser.py` | Parseo de `.replay` con subtr-actor-py |
 | `watcher.py` | `ReplayWatcher` (watchdog), cola de pendientes |
 | `replay_frames.py` | Extracción de frames 3D con rrrocket |
-| `routers/replays.py` | Endpoints `/api/replays/*`, `/api/stats/*`, `/api/status` |
+| `routers/replays.py` | Endpoints `/api/replays/*`, `/api/stats/summary`, `/api/stats/me`, `/api/status` |
+| `routers/stats.py` | Análisis y Dashboard: `/api/stats/analysis`, `/trend`, `/dashboard`, `/glossary`, `/analysis/filters` |
+| `routers/players.py` | Historial con/contra otros jugadores: `/api/players/*` |
+| `routers/viewer.py` | Subida y URL de visor de Ballchasing: `/api/replays/{id}/ballchasing` |
 | `routers/profile.py` | Endpoints `/api/profile/*`, caché tracker.gg |
 
 ### 4. Base de datos
@@ -211,6 +221,28 @@ Los frames extraídos se guardan en `data/frames/<replay_id>.json` (JSON compact
 - `getBallAtTime(t)` y `getCarsAtTime(t)` usan búsqueda binaria + interpolación lineal
 - `OrbitControls` para cámara libre
 - `ResizeObserver` para redimensionar canvas
+
+---
+
+## Análisis y estadísticas (`routers/stats.py`)
+
+Todo el análisis de comportamiento se construye sobre una única lista de métricas (`METRICS`) y un conjunto de helpers compartidos.
+
+**Métricas:** cada métrica declara `key`, `label`, `group` (offense/defense/boost/movement), `higher_better`, `unit`, `desc` y `source`. Las derivadas (p. ej. `shooting_pct = goles ÷ tiros × 100`) se calculan en `_metric_value()`. El endpoint `/glossary` expone esta tabla para la ayuda de la UI.
+
+**Roles:** para cada partida, cada jugador se clasifica como `me`, `teammates` o `opponents` según `replay.my_team`. Esto permite comparar tus medias con las de compañeros y rivales del mismo set de partidas.
+
+**Partidas anómalas:** `_is_abnormal()` marca como no representativas las partidas demasiado cortas (rendición, `< min_duration`) o con diferencia de goles excesiva (paliza, `>= max_goal_diff`). Regla clave: las anómalas **cuentan para el win rate y el recuento**, pero **se excluyen de las medias** cuando `exclude_abnormal=true`.
+
+**Filtros compartidos:** `_filtered_replays()` aplica modo, categoría y rango de fechas a nivel de query SQLAlchemy.
+
+**Endpoints:**
+- `/analysis` — medias global/victorias/derrotas por métrica y por rol.
+- `/trend` — agrupa por semana/mes (lunes como inicio de semana) → win rate y medias por periodo.
+- `/dashboard` — datos personales del jugador para la portada: KPIs, `play_style` (tarta goles/paradas/asistencias), `shooting` (goles vs tiros + %), `series` por día/semana y `recent_form` (últimas 15, que ignora el filtro de resultado).
+- `/analysis/filters` y `/glossary` — metadatos para poblar la UI.
+
+> **Contrato de la UI:** `team_sizes` y `categories` de `/analysis/filters` son arrays de objetos `{value, games}`. La UI debe leer `.value`; renderizar el objeto directo en JSX lanza "Objects are not valid as a React child" y desmonta el árbol.
 
 ---
 
