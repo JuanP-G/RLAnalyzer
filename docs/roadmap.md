@@ -1,15 +1,22 @@
 # Roadmap — RLAnalyzer
 
-> Estado actual: v0.2.0-dev — Visor 3D funcional con deduplicación correcta de coches
+> Estado actual: v0.3.0 — Dashboard rediseñado + sección Análisis + visor embebido de Ballchasing
 
 ---
 
 ## Estado actual
 
-El visor 3D está operativo. Se pueden reproducir replays con:
-- Campo, coches, balón y etiquetas de jugadores
-- Timeline con marcadores de gol
-- Controles de velocidad y cámara libre
+- **Visor 3D** operativo: campo, coches, balón y etiquetas de jugadores, timeline con marcadores de gol, controles de velocidad y cámara libre. Visor embebido de Ballchasing como alternativa.
+- **Dashboard** estilo RL Tracker: KPIs, gráficos personales (estilo de juego, goles vs tiros, forma reciente) y filtros por modo/periodo/resultado.
+- **Análisis**: comparativa victorias vs derrotas y frente a compañeros/rivales, con drill-down "¿Por qué?" y evolución temporal.
+- **Historial por jugador**: récord con/contra cualquier jugador.
+
+---
+
+## Completado recientemente (v0.3.0)
+
+- ✅ **Dashboard de tendencias temporales** — gráficos de win rate y medias por día/semana, filtrables por modo, periodo y resultado.
+- ✅ **Comparativa de comportamiento** — medias en victorias vs derrotas y frente a compañeros/rivales (sección Análisis).
 
 ---
 
@@ -62,9 +69,8 @@ El visor 3D está operativo. Se pueden reproducir replays con:
 - Seleccionar dos replays y comparar stats lado a lado
 - Indicadores de mejora/empeoramiento por categoría
 
-#### Dashboard de tendencias temporales
-- Gráficos de win rate, MMR y medias de stats a lo largo del tiempo
-- Filtrar por rango de fechas, modo de juego
+#### Tendencias de MMR en el Dashboard
+- Integrar la evolución de MMR (de tracker.gg) junto a las tendencias de stats ya existentes
 
 #### Sincronización en la nube (opcional)
 - Subir replays procesados a un servicio externo para acceso desde otro PC

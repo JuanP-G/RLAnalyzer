@@ -9,10 +9,12 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 ## Características
 
 - **Procesado automático de replays** — detecta nuevos `.replay` y los analiza sin intervención
-- **Dashboard** — resumen de victorias, derrotas, win rate y últimas partidas
+- **Dashboard** — KPIs (victorias, derrotas, win rate), gráficos personales estilo RL Tracker (estilo de juego en tarta, goles vs tiros, forma reciente V/D) y filtros por modo, periodo y resultado
+- **Análisis** — compara tus medias en victorias vs derrotas y frente a compañeros/rivales métrica a métrica, con desglose **"¿Por qué?"** que explica cada diferencia con métricas relacionadas, evolución temporal y exclusión de partidas anómalas
 - **Lista de partidas** — paginada, con filtros por resultado/modo/favoritas y detalle de cada partida
+- **Historial por jugador** — récord con/contra cualquier jugador visto en tus partidas (win rate, medias comparadas)
 - **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento, comparativa vs tu media histórica
-- **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables
+- **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables, más un visor embebido de Ballchasing
 - **Perfil** — rangos por modo (1v1, 2v2, 3v3, extras, casual), historial de MMR y estadísticas de carrera
 - **Offline-first** — sirve los últimos datos conocidos cuando no hay conexión
 - **App de escritorio** — ventana nativa de Windows sin necesidad de abrir el navegador
@@ -120,21 +122,25 @@ RLAnalyzer/
 │   ├── database.py          # Conexión a SQLite
 │   └── routers/
 │       ├── replays.py       # Endpoints de partidas + frames
+│       ├── stats.py         # Análisis y Dashboard (analysis, trend, dashboard, glossary)
+│       ├── players.py       # Historial con/contra otros jugadores
+│       ├── viewer.py        # Subida/visor de Ballchasing
 │       └── profile.py       # Endpoints de perfil + caché tracker.gg
 ├── frontend/                # UI — React + Vite + Tailwind
 │   ├── src/
-│   │   ├── pages/           # Dashboard, ReplayList, ReplayDetail, ReplayViewer, Profile
+│   │   ├── pages/           # Dashboard, Analysis, ReplayList, ReplayDetail, ReplayViewer, Profile, PlayerHistory
 │   │   ├── components/      # Sidebar, StatCard, TitleBar
 │   │   └── api.js           # Cliente HTTP con caché en memoria
 │   └── public/
 │       └── ranks/           # Iconos PNG de rangos (offline)
 ├── electron/                # Wrapper de escritorio
-│   ├── main.js              # Gestiona ventana + procesos hijo
+│   ├── main.js              # Gestiona ventana + procesos hijo + visor embebido (WebContentsView)
 │   ├── preload.js           # Puente seguro IPC (contextIsolation)
 │   └── icon.ico             # Icono de la app
 ├── data/                    # Generado automáticamente
 │   ├── rl_data.db           # Base de datos SQLite
 │   ├── profile_cache.json   # Caché de perfil tracker.gg
+│   ├── ballchasing_cache.json # Caché de URLs subidas a Ballchasing
 │   └── frames/              # Caché de frames 3D por replay (JSON compacto)
 ├── docs/                    # Documentación
 ├── tools/
@@ -160,6 +166,29 @@ RLAnalyzer/
 | Gráficos | Recharts |
 | Desktop | Electron (frameless, custom titlebar) |
 | Perfil | tracker.gg API / web scraping / caché offline |
+
+---
+
+## Dashboard y Análisis
+
+Dos secciones distintas y complementarias, ambas centradas en tu jugador:
+
+**Dashboard** (`/`) — vista rápida del estado actual:
+- KPIs: partidas, victorias, derrotas, win rate y medias (goles, paradas, puntuación)
+- **Estilo de juego** — tarta con el reparto goles / paradas / asistencias
+- **Tiros: goles vs tiros** — barras de goles y tiros + línea de % de acierto
+- **Forma reciente** — últimas 15 partidas como cuadros V/D
+- Filtros: modo (1v1/2v2/3v3), periodo (todo / 7 / 30 / 90 días), resultado (V/D), excluir anómalas; agrupación por día o semana
+- Tabla compacta de partidas recientes
+
+**Análisis** (`/analysis`) — comparativas profundas para entender *por qué* ganas o pierdes:
+- Tus medias **en victorias vs derrotas**, métrica a métrica
+- Comparativa con **compañeros** y **rivales** del mismo set de partidas
+- Desglose **"¿Por qué?"**: al expandir una métrica, se muestran las métricas relacionadas que explican la diferencia
+- **Evolución temporal** por semana/mes
+- Exclusión de partidas anómalas (rendiciones cortas o palizas) para no distorsionar las medias — el win rate siempre usa todas las partidas
+
+> Las partidas anómalas se definen por defecto como menos de 240 s de duración o una diferencia de goles ≥ 5.
 
 ---
 

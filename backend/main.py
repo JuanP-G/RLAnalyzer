@@ -34,6 +34,7 @@ from routers.replays import router
 from routers.profile import router as profile_router
 from routers.players import router as players_router
 from routers.viewer  import router as viewer_router
+from routers.stats   import router as stats_router
 from config import BACKEND_PORT
 
 logging.basicConfig(
@@ -192,6 +193,7 @@ app.include_router(router)
 app.include_router(profile_router)
 app.include_router(players_router)
 app.include_router(viewer_router)
+app.include_router(stats_router)
 
 
 @app.get("/")

@@ -12,7 +12,7 @@
  *   - Si falla → igual que arriba.
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 
 // Detecta si estamos dentro de Electron
@@ -67,68 +67,56 @@ export default function ReplayViewer() {
   const currentTRef = useRef(0)
   const labelRefs   = useRef([])
 
-  // Webview de Ballchasing (Electron)
-  const webviewRef    = useRef(null)
+  // Visor embebido de Ballchasing (Electron, vía WebContentsView).
+  // wvContainerRef apunta a un div-placeholder normal: medimos su rectángulo y se
+  // lo pasamos al proceso principal, que coloca encima una WebContentsView real.
+  // A diferencia de <webview>, una WebContentsView usa la misma ruta de render de
+  // Chromium que la ventana → el visor WebGL 3D se renderiza correctamente, como
+  // un navegador metido dentro de la app.
   const wvContainerRef = useRef(null)
-  const [bcWebLoading, setBcWebLoading] = useState(true)
 
   // URL de Ballchasing con el hash #watch para ir directo al visor 3D
   const bcWatchUrl = bcUrl ? `${bcUrl.split('#')[0]}#watch` : null
 
-  // ResizeObserver: sincroniza píxeles exactos del contenedor al webview.
-  // height:100% / inset:0 no funcionan de forma fiable en <webview> de Electron
-  // cuando la altura viene de una cadena flex. Píxeles explícitos son la única
-  // solución robusta.
-  useEffect(() => {
-    if (viewerState !== 'bc_ready' || !isElectron) return
-    const container = wvContainerRef.current
-    const wv        = webviewRef.current
-    if (!container || !wv) return
+  // Crea la WebContentsView, la sincroniza con el rectángulo del placeholder y la
+  // destruye al desmontar / cambiar de estado.
+  useLayoutEffect(() => {
+    if (viewerState !== 'bc_ready' || !isElectron || !bcWatchUrl) return
 
+    const boundsOf = () => {
+      const el = wvContainerRef.current
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return { x: r.left, y: r.top, width: r.width, height: r.height }
+    }
+
+    let opened = false
     const sync = () => {
-      const { width, height } = container.getBoundingClientRect()
-      if (width > 0 && height > 0) {
-        wv.style.width  = `${width}px`
-        wv.style.height = `${height}px`
+      const b = boundsOf()
+      if (!b || b.width <= 0 || b.height <= 0) return
+      if (!opened) {
+        opened = true
+        window.electronAPI.bcViewOpen(bcWatchUrl, b)
+      } else {
+        window.electronAPI.bcViewSetBounds(b)
       }
     }
 
-    sync()
+    sync() // inmediato y síncrono, antes del primer paint
+
     const ro = new ResizeObserver(sync)
-    ro.observe(container)
-    return () => ro.disconnect()
-  }, [viewerState])
+    if (wvContainerRef.current) ro.observe(wvContainerRef.current)
+    window.addEventListener('resize', sync)
+    // El scroll de la app puede mover el placeholder (cambia rect.top)
+    window.addEventListener('scroll', sync, true)
 
-  // Cuando la página de Ballchasing termine de cargar: ocultar el banner de
-  // donación (única inyección CSS) y hacer scroll a la sección #watch
-  useEffect(() => {
-    if (viewerState !== 'bc_ready' || !isElectron) return
-    setBcWebLoading(true)
-    const wv = webviewRef.current
-    if (!wv) return
-
-    const onLoad = async () => {
-      try {
-        // Solo ocultar el banner de donación, nada más (evita romper el layout)
-        await wv.insertCSS(`
-          [class*="support"], [class*="patron"], [class*="donate"] {
-            display: none !important;
-          }
-        `)
-        // Scroll al visor 3D
-        await wv.executeJavaScript(`
-          (() => {
-            const el = document.getElementById('watch');
-            if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
-          })();
-        `)
-      } catch (_) { /* no crítico */ }
-      setBcWebLoading(false)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', sync)
+      window.removeEventListener('scroll', sync, true)
+      window.electronAPI.bcViewClose()
     }
-
-    wv.addEventListener('did-finish-load', onLoad)
-    return () => wv.removeEventListener('did-finish-load', onLoad)
-  }, [viewerState])
+  }, [viewerState, bcWatchUrl])
 
   // ── Carga inicial: replay metadata + intento Ballchasing ─────────────────
   useEffect(() => {
@@ -283,34 +271,16 @@ export default function ReplayViewer() {
           </div>
         </div>
 
-        {/* Webview: Ballchasing embebido.
-            wvContainerRef mide el espacio real en px y se lo pasa al webview via ResizeObserver.
-            height:100% / inset:0 no son fiables en <webview> de Electron — píxeles explícitos sí. */}
+        {/* Placeholder del visor embebido de Ballchasing.
+            Es un div normal: el useLayoutEffect mide su rectángulo y se lo pasa al
+            proceso principal, que monta encima una WebContentsView (navegador real
+            con WebGL) ocupando exactamente este espacio. El fondo oscuro se ve
+            mientras la WebContentsView carga. */}
         <div
           ref={wvContainerRef}
           className="flex-1"
-          style={{ position: 'relative', overflow: 'hidden', minHeight: 0 }}
-        >
-          {bcWebLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10"
-                 style={{ background: '#04090F' }}>
-              <div className="relative w-14 h-14">
-                <div className="absolute inset-0 rounded-full border-2 border-t-rl-blue border-transparent animate-spin" />
-                <div className="absolute inset-2 flex items-center justify-center">
-                  <BcIcon size={20} color="#2B6FD4" />
-                </div>
-              </div>
-              <p className="text-gray-400 text-sm">Cargando visor de Ballchasing…</p>
-            </div>
-          )}
-          {/* eslint-disable-next-line react/no-unknown-property */}
-          <webview
-            ref={webviewRef}
-            src={bcWatchUrl}
-            style={{ display: 'block' }}
-            allowpopups=""
-          />
-        </div>
+          style={{ position: 'relative', overflow: 'hidden', minHeight: 0, background: '#04090F' }}
+        />
       </div>
     )
 
