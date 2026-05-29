@@ -30,7 +30,7 @@ from models import Replay, PlayerStat
 router = APIRouter(prefix="/api", tags=["stats"])
 
 # Umbrales por defecto para detectar partidas anómalas
-DEFAULT_MIN_DURATION = 240   # segundos — por debajo se considera rendición / incompleta
+DEFAULT_MIN_DURATION = 180   # segundos — por debajo se considera rendición / incompleta
 DEFAULT_MAX_GOAL_DIFF = 5    # diferencia de goles — a partir de aquí es una paliza
 
 # Etiquetas de origen del dato (para el glosario de la UI)

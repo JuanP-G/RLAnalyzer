@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
 import { api } from '../api'
+import AbnormalHelp from '../components/AbnormalHelp'
 
 // ── Constantes de estilo ───────────────────────────────────────────────────────
 const C = {
@@ -277,7 +278,7 @@ export default function Analysis() {
   const [filters, setFilters] = useState(null)
   const [sel, setSel] = useState({
     team_size: null, category: null, period: 'all',
-    exclude_abnormal: true, min_duration: 240, max_goal_diff: 5,
+    exclude_abnormal: true, min_duration: 180, max_goal_diff: 5,
   })
   const [view, setView] = useState('compare')   // compare | trend
   const [data, setData] = useState(null)
@@ -380,12 +381,15 @@ export default function Analysis() {
 
         {/* Control de partidas anómalas */}
         <div className="flex flex-wrap items-center gap-3 mt-3">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={sel.exclude_abnormal}
-              onChange={e => setF({ exclude_abnormal: e.target.checked })}
-              style={{ accentColor: C.me }} />
-            <span className="text-xs text-gray-300">Excluir partidas anómalas del análisis</span>
-          </label>
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={sel.exclude_abnormal}
+                onChange={e => setF({ exclude_abnormal: e.target.checked })}
+                style={{ accentColor: C.me }} />
+              <span className="text-xs text-gray-300">Excluir partidas anómalas del análisis</span>
+            </label>
+            <AbnormalHelp minDuration={sel.min_duration} maxGoalDiff={sel.max_goal_diff} />
+          </div>
           {sel.exclude_abnormal && (
             <>
               <NumField label="Dur. mín (s)" value={sel.min_duration}
