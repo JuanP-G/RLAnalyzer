@@ -231,7 +231,7 @@ Datos personales para el **Dashboard**, segmentables por modo, periodo y resulta
 | `date_from` / `date_to` | string | Rango de fechas (`YYYY-MM-DD`) |
 | `bucket` | string | Agrupación de la serie: `day` (default) \| `week` |
 | `exclude_abnormal` | bool | Excluir partidas anómalas de las medias (default `true`) |
-| `min_duration` | int | Umbral de rendición en segundos (default 240) |
+| `min_duration` | int | Umbral de rendición en segundos (default 180) |
 | `max_goal_diff` | int | Umbral de paliza por diferencia de goles (default 5) |
 
 **Respuesta (resumida):**
@@ -271,7 +271,7 @@ Opciones disponibles para los desplegables de filtro de la sección Análisis, c
   "total": 142,
   "date_min": "2026-01-04T18:22:00",
   "date_max": "2026-05-25T21:14:00",
-  "defaults": { "min_duration": 240, "max_goal_diff": 5 }
+  "defaults": { "min_duration": 180, "max_goal_diff": 5 }
 }
 ```
 
@@ -283,7 +283,7 @@ Opciones disponibles para los desplegables de filtro de la sección Análisis, c
 
 Comparativa de medias (global / victorias / derrotas) tuyas, de tus compañeros y de tus rivales, métrica a métrica, para el set de partidas filtrado.
 
-**Query params:** `team_size`, `category`, `date_from`, `date_to`, `exclude_abnormal` (default `true`), `min_duration` (240), `max_goal_diff` (5).
+**Query params:** `team_size`, `category`, `date_from`, `date_to`, `exclude_abnormal` (default `true`), `min_duration` (180), `max_goal_diff` (5).
 
 **Respuesta (resumida):**
 ```json
@@ -334,7 +334,7 @@ Descripción y origen de cada métrica disponible, más la definición de partid
 **Respuesta:**
 ```json
 {
-  "abnormal": { "min_duration": 240, "max_goal_diff": 5, "desc": "..." },
+  "abnormal": { "min_duration": 180, "max_goal_diff": 5, "desc": "..." },
   "metrics": [
     { "key": "avg_boost", "label": "Boost medio", "group": "boost", "unit": "",
       "higher_better": true, "desc": "...", "source": "Stats avanzadas (subtr-actor)" }
