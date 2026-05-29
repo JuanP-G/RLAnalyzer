@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   PieChart, Pie, Cell, ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { api } from '../api'
 import StatCard from '../components/StatCard'
+import AbnormalHelp from '../components/AbnormalHelp'
 import { getMapName } from '../utils/mapNames'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────────
@@ -135,6 +136,8 @@ function PlayStylePie({ ps }) {
           </Pie>
           <Tooltip
             contentStyle={{ background: '#071829', border: '1px solid #1A3A5C', borderRadius: 10, fontSize: 12 }}
+            itemStyle={{ color: '#E5EEF7' }}
+            labelStyle={{ color: '#E5EEF7' }}
             formatter={(v, n) => [`${v} (${Math.round(v / total * 100)}%)`, n]} />
         </PieChart>
       </ResponsiveContainer>
@@ -241,9 +244,39 @@ function Empty({ msg }) {
   return <div className="flex-1 flex items-center justify-center text-gray-600 text-sm py-8">{msg}</div>
 }
 
+// ── Botón "Ver en visor 3D" (mismo estilo que en la lista de partidas) ──────────
+function Viewer3DButton({ id }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); navigate(`/viewer/${id}`) }}
+      title="Ver en visor 3D"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all hover:scale-105"
+      style={{ background: '#071829', border: '1px solid #122A4D', color: '#5888B4' }}
+      onMouseEnter={e => { e.currentTarget.style.color = '#00A8FF'; e.currentTarget.style.borderColor = '#00A8FF44' }}
+      onMouseLeave={e => { e.currentTarget.style.color = '#5888B4'; e.currentTarget.style.borderColor = '#122A4D' }}
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+        <polygon points="5,0.5 9,3 9,7 5,9.5 1,7 1,3" opacity="0.2" fill="currentColor" stroke="none"/>
+        <polyline points="5,0.5 9,3 5,5.5 1,3 5,0.5"/>
+        <line x1="5" y1="5.5" x2="5" y2="9.5"/>
+        <line x1="9" y1="3" x2="9" y2="7"/>
+        <line x1="1" y1="3" x2="1" y2="7"/>
+        <line x1="5" y1="9.5" x2="1" y2="7"/>
+        <line x1="5" y1="9.5" x2="9" y2="7"/>
+      </svg>
+      3D
+    </button>
+  )
+}
+
 // ── Página principal ────────────────────────────────────────────────────────────
+// Umbrales por defecto (se sincronizan con el backend vía /stats/analysis/filters)
+const ABNORMAL_FALLBACK = { min_duration: 180, max_goal_diff: 5 }
+
 export default function Dashboard() {
   const [teamSizes, setTeamSizes] = useState([])
+  const [abnormal, setAbnormal] = useState(ABNORMAL_FALLBACK)
   const [data, setData]   = useState(null)
   const [replays, setReplays] = useState([])
   const [loading, setLoading] = useState(true)
@@ -254,10 +287,24 @@ export default function Dashboard() {
     exclude_abnormal: true, bucket: 'day',
   })
 
-  // Opciones de modo disponibles
+  // Opciones de modo disponibles + umbrales de anomalía del backend
   useEffect(() => {
-    api.analysisFilters().then(f => setTeamSizes(f?.team_sizes || [])).catch(() => {})
+    api.analysisFilters().then(f => {
+      setTeamSizes(f?.team_sizes || [])
+      if (f?.defaults) setAbnormal({
+        min_duration: f.defaults.min_duration ?? ABNORMAL_FALLBACK.min_duration,
+        max_goal_diff: f.defaults.max_goal_diff ?? ABNORMAL_FALLBACK.max_goal_diff,
+      })
+    }).catch(() => {})
   }, [])
+
+  // Misma lógica que _is_abnormal() del backend: rendición corta o paliza
+  const isAbnormal = useCallback((r) => {
+    if (r.duration_secs != null && r.duration_secs < abnormal.min_duration) return 'corta'
+    if (r.team0_score != null && r.team1_score != null
+        && Math.abs(r.team0_score - r.team1_score) >= abnormal.max_goal_diff) return 'paliza'
+    return null
+  }, [abnormal])
 
   const apiFilters = useMemo(() => ({
     team_size: sel.team_size,
@@ -328,12 +375,15 @@ export default function Dashboard() {
           <Pill active={sel.bucket === 'day'} onClick={() => setSel(s => ({ ...s, bucket: 'day' }))}>Por día</Pill>
           <Pill active={sel.bucket === 'week'} onClick={() => setSel(s => ({ ...s, bucket: 'week' }))}>Por semana</Pill>
         </Field>
-        <label className="flex items-center gap-2 cursor-pointer ml-auto">
-          <input type="checkbox" checked={sel.exclude_abnormal}
-                 onChange={e => setSel(s => ({ ...s, exclude_abnormal: e.target.checked }))}
-                 className="accent-rl-blue w-3.5 h-3.5" />
-          <span className="text-xs text-gray-400">Excluir anómalas</span>
-        </label>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={sel.exclude_abnormal}
+                   onChange={e => setSel(s => ({ ...s, exclude_abnormal: e.target.checked }))}
+                   className="accent-rl-blue w-3.5 h-3.5" />
+            <span className="text-xs text-gray-400">Excluir anómalas</span>
+          </label>
+          <AbnormalHelp minDuration={abnormal.min_duration} maxGoalDiff={abnormal.max_goal_diff} />
+        </div>
       </div>
 
       {loading && !data ? (
@@ -392,17 +442,34 @@ export default function Dashboard() {
                     <th className="px-4 py-2 text-left">Marcador</th>
                     <th className="px-4 py-2 text-left">Duración</th>
                     <th className="px-4 py-2 text-left">Fecha</th>
+                    <th className="px-3 py-2 text-left"></th>
                     <th className="px-4 py-2 text-left"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {replays.map((r, i) => (
+                  {replays.map((r, i) => {
+                    const anom = isAbnormal(r)
+                    return (
                     <tr key={r.id} className="transition-colors hover:bg-bg-hover"
                         style={{ borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240' }}>
                       <td className="px-2 py-2 text-center w-8">
                         <StarButton isFav={r.is_favorite} onClick={(e) => toggleFavorite(r, e)} />
                       </td>
-                      <td className="px-4 py-2"><ResultBadge result={r.result} /></td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <ResultBadge result={r.result} />
+                          {anom && (
+                            <span
+                              title={anom === 'corta'
+                                ? `Partida anómala: duración inferior a ${Math.round(abnormal.min_duration / 60)} min (probable rendición)`
+                                : `Partida anómala: diferencia de ${abnormal.max_goal_diff}+ goles (paliza)`}
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded border"
+                              style={{ background: 'rgba(245,166,35,0.14)', color: '#F5A623', borderColor: 'rgba(245,166,35,0.35)' }}>
+                              ⚠ Anómala
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2 text-gray-200 font-medium truncate max-w-[180px]">{getMapName(r.map_name)}</td>
                       <td className="px-4 py-2 text-gray-300">
                         {r.match_type
@@ -414,11 +481,15 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-2 font-mono-num text-gray-300">{formatDuration(r.duration_secs)}</td>
                       <td className="px-4 py-2 text-gray-400 text-xs">{formatDate(r.played_at)}</td>
+                      <td className="px-3 py-2">
+                        <Viewer3DButton id={r.id} />
+                      </td>
                       <td className="px-4 py-2">
-                        <Link to={`/replays/${r.id}`} className="text-rl-blue text-xs hover:underline">Ver →</Link>
+                        <Link to={`/replays/${r.id}`} className="text-rl-blue text-xs hover:underline whitespace-nowrap">Detalles →</Link>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
