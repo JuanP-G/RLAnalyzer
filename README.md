@@ -11,7 +11,8 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 - **Procesado automático de replays** — detecta nuevos `.replay` y los analiza sin intervención
 - **Dashboard** — KPIs (victorias, derrotas, win rate), gráficos personales estilo RL Tracker (estilo de juego en tarta, goles vs tiros, forma reciente V/D) y filtros por modo, periodo y resultado
 - **Análisis** — compara tus medias en victorias vs derrotas y frente a compañeros/rivales métrica a métrica, con desglose **"¿Por qué?"** que explica cada diferencia con métricas relacionadas, evolución temporal y exclusión de partidas anómalas
-- **Lista de partidas** — paginada, con filtros por resultado/modo/favoritas y detalle de cada partida
+- **Comparar partidas** — enfrenta dos partidas (A vs B) mostrando tus stats, el total de tu equipo y el del rival, con delta coloreado por métrica y un resumen automático de **"qué hiciste distinto"**
+- **Lista de partidas** — paginada, con filtros por resultado/modo/favoritas, modo "Comparar" para elegir dos partidas y detalle de cada partida
 - **Historial por jugador** — récord con/contra cualquier jugador visto en tus partidas (win rate, medias comparadas)
 - **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento, comparativa vs tu media histórica
 - **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables, más un visor embebido de Ballchasing
@@ -128,8 +129,9 @@ RLAnalyzer/
 │       └── profile.py       # Endpoints de perfil + caché tracker.gg
 ├── frontend/                # UI — React + Vite + Tailwind
 │   ├── src/
-│   │   ├── pages/           # Dashboard, Analysis, ReplayList, ReplayDetail, ReplayViewer, Profile, PlayerHistory
-│   │   ├── components/      # Sidebar, StatCard, TitleBar
+│   │   ├── pages/           # Dashboard, Analysis, Compare, ReplayList, ReplayDetail, ReplayViewer, Profile, PlayerHistory
+│   │   ├── components/      # Sidebar, StatCard, AbnormalHelp, TitleBar
+│   │   ├── utils/           # mapNames, compareStats (lógica del comparador)
 │   │   └── api.js           # Cliente HTTP con caché en memoria
 │   └── public/
 │       └── ranks/           # Iconos PNG de rangos (offline)
@@ -188,7 +190,13 @@ Dos secciones distintas y complementarias, ambas centradas en tu jugador:
 - **Evolución temporal** por semana/mes
 - Exclusión de partidas anómalas (rendiciones cortas o palizas) para no distorsionar las medias — el win rate siempre usa todas las partidas
 
-> Las partidas anómalas se definen por defecto como menos de 240 s de duración o una diferencia de goles ≥ 5.
+> Las partidas anómalas se definen por defecto como menos de 180 s de duración o una diferencia de goles ≥ 5.
+
+**Comparar** (`/compare`) — enfrenta dos partidas para ver qué hiciste distinto:
+- Selecciona **dos partidas** (desde la sección o marcando dos en la lista de Partidas)
+- Tres vistas: **tus** stats, el **total de tu equipo** y el del **equipo rival**
+- Columna **Δ (A−B)** coloreada según si mejoras o empeoras en cada métrica
+- Resumen automático **"qué hiciste distinto"** con las mayores diferencias
 
 ---
 

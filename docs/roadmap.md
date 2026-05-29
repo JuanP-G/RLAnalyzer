@@ -1,6 +1,6 @@
 # Roadmap — RLAnalyzer
 
-> Estado actual: v0.3.0 — Dashboard rediseñado + sección Análisis + visor embebido de Ballchasing
+> Estado actual: v0.3.1 — Comparador de partidas + retoques del Dashboard (sobre v0.3.0)
 
 ---
 
@@ -9,12 +9,18 @@
 - **Visor 3D** operativo: campo, coches, balón y etiquetas de jugadores, timeline con marcadores de gol, controles de velocidad y cámara libre. Visor embebido de Ballchasing como alternativa.
 - **Dashboard** estilo RL Tracker: KPIs, gráficos personales (estilo de juego, goles vs tiros, forma reciente) y filtros por modo/periodo/resultado.
 - **Análisis**: comparativa victorias vs derrotas y frente a compañeros/rivales, con drill-down "¿Por qué?" y evolución temporal.
+- **Comparar**: dos partidas lado a lado (yo + totales de equipo y rival) con delta coloreado y resumen "qué hiciste distinto".
 - **Historial por jugador**: récord con/contra cualquier jugador.
 
 ---
 
-## Completado recientemente (v0.3.0)
+## Completado recientemente
 
+### v0.3.1
+- ✅ **Comparativa entre dos partidas** — seleccionar dos replays y comparar stats lado a lado (yo / mi equipo / equipo rival) con indicadores de mejora/empeoramiento.
+- ✅ **Retoques del Dashboard** — legibilidad de tooltips, indicador de partidas anómalas, botón al visor 3D en las últimas partidas y ayuda contextual sobre partidas anómalas.
+
+### v0.3.0
 - ✅ **Dashboard de tendencias temporales** — gráficos de win rate y medias por día/semana, filtrables por modo, periodo y resultado.
 - ✅ **Comparativa de comportamiento** — medias en victorias vs derrotas y frente a compañeros/rivales (sección Análisis).
 
@@ -64,10 +70,6 @@
 
 #### Soporte multi-jugador en el visor
 - Ahora `PLAYER_NAME` es un único jugador. Poder cambiar el jugador "principal" desde la UI sin editar `config.py`.
-
-#### Comparativa entre dos partidas
-- Seleccionar dos replays y comparar stats lado a lado
-- Indicadores de mejora/empeoramiento por categoría
 
 #### Tendencias de MMR en el Dashboard
 - Integrar la evolución de MMR (de tracker.gg) junto a las tendencias de stats ya existentes

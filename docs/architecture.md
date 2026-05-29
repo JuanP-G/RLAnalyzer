@@ -65,7 +65,8 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 |------|------------|-------------|
 | `/` | `Dashboard.jsx` | KPIs, gráficos personales (tarta, tiros, forma) y filtros |
 | `/analysis` | `Analysis.jsx` | Comparativa V/D vs compañeros/rivales + drill-down "¿Por qué?" |
-| `/replays` | `ReplayList.jsx` | Lista paginada con filtros |
+| `/compare` | `Compare.jsx` | Comparar dos partidas (yo + totales de equipo y rival) con delta y resumen |
+| `/replays` | `ReplayList.jsx` | Lista paginada con filtros (+ modo "Comparar" para elegir 2 partidas) |
 | `/replays/:id` | `ReplayDetail.jsx` | Detalle de una partida, comparativa |
 | `/viewer` | `ViewerList.jsx` | Listado de replays para abrir en el visor |
 | `/viewer/:id` | `ReplayViewer.jsx` | Visor 3D Three.js + visor embebido de Ballchasing |
@@ -80,6 +81,11 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 - `TitleBar.jsx` — barra de título personalizada con controles min/max/close vía IPC
 - `Sidebar.jsx` — navegación lateral
 - `StatCard.jsx` — tarjeta de estadística reutilizable
+- `AbnormalHelp.jsx` — icono "?" con tooltip que explica qué es una partida anómala (Dashboard y Análisis)
+
+**Utilidades (`src/utils/`):**
+- `mapNames.js` — nombres legibles de mapas
+- `compareStats.js` — lógica pura del comparador de partidas: resuelve mi equipo/rival, agrega por equipo (suma para recuentos, media para `avg_boost`/`avg_speed`, `shooting_pct` derivado), calcula el delta con color según `higher_better` y genera el resumen "qué hiciste distinto". Replica el cálculo del backend para que los números cuadren con `/api/stats/analysis`.
 
 ### 3. Backend (`backend/`)
 
@@ -243,6 +249,8 @@ Todo el análisis de comportamiento se construye sobre una única lista de métr
 - `/analysis/filters` y `/glossary` — metadatos para poblar la UI.
 
 > **Contrato de la UI:** `team_sizes` y `categories` de `/analysis/filters` son arrays de objetos `{value, games}`. La UI debe leer `.value`; renderizar el objeto directo en JSX lanza "Objects are not valid as a React child" y desmonta el árbol.
+
+**Comparador de dos partidas (`Compare.jsx`):** no añade endpoints. Pide los dos replays con `GET /api/replays/{id}` y la tabla de métricas con `GET /api/stats/glossary`, y hace todo el cálculo en el cliente (`utils/compareStats.js`) reutilizando las mismas reglas de agregación y `higher_better`. Compara tres roles —yo, mi equipo (agregado), equipo rival (agregado)— porque los compañeros/rivales individuales no son los mismos entre partidas distintas.
 
 ---
 

@@ -118,6 +118,18 @@ export default function ReplayList() {
   const [loading, setLoading] = useState(true)
   const [limit,   setLimit]   = useState(15)
 
+  // Modo "Comparar": seleccionar exactamente 2 partidas para enviarlas a /compare
+  const [compareMode, setCompareMode] = useState(false)
+  const [selected, setSelected] = useState([])
+
+  const toggleSelect = useCallback((id) => {
+    setSelected(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      if (prev.length >= 2) return prev   // máximo 2
+      return [...prev, id]
+    })
+  }, [])
+
   const hasFilters = favOnly || filterResult || filterTeamSize
 
   const clearFilters = useCallback(() => {
@@ -243,6 +255,31 @@ export default function ReplayList() {
             <span style={{ fontSize: '0.85rem' }}>{favOnly ? '★' : '☆'}</span>
             Favoritas
           </button>
+
+          <div className="w-px h-4 flex-shrink-0" style={{ background: '#122A4D' }} />
+
+          {/* Comparar */}
+          <button
+            onClick={() => { setCompareMode(m => !m); setSelected([]) }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all"
+            style={{
+              background: compareMode ? '#1A3A5C' : '#071829',
+              border: `1px solid ${compareMode ? '#00A8FF' : '#122A4D'}`,
+              color: compareMode ? '#00A8FF' : '#5888B4',
+            }}
+          >
+            ⇄ Comparar
+          </button>
+          {compareMode && (
+            <button
+              onClick={() => { if (selected.length === 2) navigate(`/compare?a=${selected[0]}&b=${selected[1]}`) }}
+              disabled={selected.length !== 2}
+              className="px-3 py-1 rounded-full text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(0,168,255,0.15)', border: '1px solid rgba(0,168,255,0.45)', color: '#fff' }}
+            >
+              Comparar ({selected.length}/2)
+            </button>
+          )}
         </div>
       </div>
 
@@ -287,14 +324,31 @@ export default function ReplayList() {
                 </tr>
               </thead>
               <tbody>
-                {replays.map((r, i) => (
+                {replays.map((r, i) => {
+                  const isSel = compareMode && selected.includes(r.id)
+                  const maxedOut = compareMode && !isSel && selected.length >= 2
+                  return (
                   <tr
                     key={r.id}
                     className="transition-colors hover:bg-bg-hover"
-                    style={{ borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240' }}
+                    style={{
+                      borderBottom: i === replays.length - 1 ? 'none' : '1px solid #0D2240',
+                      background: isSel ? 'rgba(0,168,255,0.08)' : undefined,
+                      borderLeft: isSel ? '3px solid #00A8FF' : '3px solid transparent',
+                    }}
                   >
                     <td className="px-2 py-3 text-center w-8">
-                      <StarButton isFav={r.is_favorite} onClick={(e) => toggleFavorite(r, e)} />
+                      {compareMode ? (
+                        <input
+                          type="checkbox"
+                          checked={isSel}
+                          disabled={maxedOut}
+                          onChange={() => toggleSelect(r.id)}
+                          className="accent-rl-blue w-4 h-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                        />
+                      ) : (
+                        <StarButton isFav={r.is_favorite} onClick={(e) => toggleFavorite(r, e)} />
+                      )}
                     </td>
                     <td className="px-4 py-3"><ResultBadge result={r.result} /></td>
                     <td className="px-4 py-3 text-gray-200 truncate max-w-[200px]">
@@ -348,7 +402,8 @@ export default function ReplayList() {
                       </Link>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           )}

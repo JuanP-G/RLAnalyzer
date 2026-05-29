@@ -10,6 +10,7 @@ import ViewerList from './pages/ViewerList'
 import Profile from './pages/Profile'
 import PlayerHistory from './pages/PlayerHistory'
 import Analysis from './pages/Analysis'
+import Compare from './pages/Compare'
 import { api } from './api'
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/replays"       element={<ReplayList />} />
             <Route path="/replays/:id"   element={<ReplayDetail />} />
             <Route path="/analysis"      element={<Analysis />} />
+            <Route path="/compare"       element={<Compare />} />
           <Route path="/viewer"          element={<ViewerList />} />
             <Route path="/viewer/:id"      element={<ReplayViewer />} />
             <Route path="/profile"        element={<Profile />} />
