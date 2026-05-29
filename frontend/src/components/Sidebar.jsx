@@ -54,10 +54,20 @@ function IconAnalysis() {
     </svg>
   )
 }
+function IconCompare() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <rect x="1"   y="3" width="6.5" height="10" rx="1.5" opacity="0.55"/>
+      <rect x="8.5" y="3" width="6.5" height="10" rx="1.5" opacity="0.9"/>
+      <line x1="8" y1="1.5" x2="8" y2="14.5" stroke="currentColor" strokeWidth="0.9" opacity="0.4"/>
+    </svg>
+  )
+}
 const links = [
   { to: '/profile',  label: 'Mi Perfil',  Icon: IconProfile },
   { to: '/',         label: 'Dashboard',  Icon: IconDashboard },
   { to: '/replays',  label: 'Partidas',   Icon: IconReplays },
+  { to: '/compare',  label: 'Comparar',   Icon: IconCompare },
   { to: '/analysis', label: 'Análisis',   Icon: IconAnalysis },
   { to: '/viewer',   label: 'Visor 3D',   Icon: IconViewer3D },
 ]
