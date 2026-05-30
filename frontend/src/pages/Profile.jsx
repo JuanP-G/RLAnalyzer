@@ -220,18 +220,21 @@ function RankCard({ playlist, index }) {
 
       {/* Stats inferiores */}
       {(() => {
+        // tracker.gg devuelve el percentil "mejor que X% de jugadores" → el top en
+        // el que estás es 100 − percentile. Dorado solo si estás en el top ≤ 5%.
         const pct = playlist.percentile
-        // "Top X%": dorado siempre; con brillo extra cuando estás en un top destacado (≤ 10%)
-        const topStrong = pct != null && pct <= 10
-        const topStyle = pct == null
+        const topPct = pct != null ? 100 - pct : null
+        const isGold = topPct != null && topPct <= 5
+        const topStyle = topPct == null
           ? { color: '#C2D6F5' }
-          : { color: topStrong ? '#FFC93C' : '#E0A82E',
-              textShadow: topStrong ? '0 0 8px rgba(255,184,0,0.6)' : 'none' }
+          : isGold
+            ? { color: '#FFC93C', textShadow: '0 0 8px rgba(255,184,0,0.6)' }
+            : { color: '#C2D6F5' }
         const rank = playlist.globalRank
         const cells = [
           { label: 'Partidas', value: playlist.matchesPlayed },
           { label: 'Rank',     value: rank != null ? `#${Math.round(rank).toLocaleString('es-ES')}` : null },
-          { label: 'Top',      value: pct != null ? `${pct.toFixed(1)}%` : null, style: topStyle },
+          { label: 'Top',      value: topPct != null ? `${topPct.toFixed(1)}%` : null, style: topStyle },
           { label: 'Racha',    value: streakStr, style: streakStr ? { color: streakColor } : undefined },
         ]
         return (
