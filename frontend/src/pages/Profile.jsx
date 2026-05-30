@@ -136,13 +136,34 @@ function ErrorBox({ error, onRetry }) {
   )
 }
 
+// ── DivisionDelta: MMR para subir (▲) / bajar (▼) de división, estilo RL Tracker ──
+// Apilado en vertical, a la derecha del MMR. Sin "mmr" (se sobreentiende).
+function DivisionDelta({ up, down }) {
+  if (up == null && down == null) return null
+  return (
+    <div className="flex flex-col gap-0.5 items-end flex-shrink-0"
+         title="MMR para subir / bajar de división">
+      {up != null && (
+        <div className="flex items-center gap-1 leading-none">
+          <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,0 8,8 0,8" fill="#3DDB85"/></svg>
+          <span className="font-mono-num font-bold text-xs" style={{ color: '#3DDB85' }}>{Math.round(up)}</span>
+        </div>
+      )}
+      {down != null && (
+        <div className="flex items-center gap-1 leading-none">
+          <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,8 8,0 0,0" fill="#FF4757"/></svg>
+          <span className="font-mono-num font-bold text-xs" style={{ color: '#FF4757' }}>{Math.round(down)}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── RankCard ─────────────────────────────────────────────────────────────────
 function RankCard({ playlist, index }) {
   const meta    = PLAYLIST_META[playlist.playlistId] || { label: playlist.name, color: '#7B91B0' }
   const dDown   = playlist.divisionDown
   const dUp     = playlist.divisionUp
-  const hasProg = dDown != null && dUp != null && (dDown + dUp) > 0
-  const divPct  = hasProg ? Math.round((dDown / (dDown + dUp)) * 100) : null
   const streak  = playlist.winStreak
   const streakStr   = streak == null ? null : streak > 0 ? `+${streak}` : streak < 0 ? `${streak}` : '0'
   const streakColor = streak > 0 ? '#3DDB85' : streak < 0 ? '#FF4757' : '#7B91B0'
@@ -180,58 +201,21 @@ function RankCard({ playlist, index }) {
             <p className="text-gray-400 text-xs mt-0.5">{playlist.divisionName}</p>
           )}
           {playlist.mmr != null && (
-            <p className="font-mono-num font-bold text-xl leading-tight mt-1.5" style={{ color: meta.color }}>
-              {Math.round(playlist.mmr)}{' '}
-              <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
-            </p>
+            <div className="flex items-end justify-between gap-2 mt-1.5">
+              <p className="font-mono-num font-bold text-xl leading-none" style={{ color: meta.color }}>
+                {Math.round(playlist.mmr)}{' '}
+                <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
+              </p>
+              <DivisionDelta up={dUp} down={dDown} />
+            </div>
           )}
           {playlist.peak != null && (
-            <p className="text-gray-500 text-[10px] mt-0.5 font-mono-num">
+            <p className="text-gray-500 text-[10px] mt-1 font-mono-num">
               Pico: {Math.round(playlist.peak)} MMR
             </p>
           )}
         </div>
       </div>
-
-      {/* Barra de progreso de división + MMR flechas */}
-      {hasProg && (
-        <div className="px-4 pb-3">
-          {/* Flechas MMR arriba/abajo */}
-          <div className="flex items-center justify-between mb-2">
-            {/* Bajar división */}
-            <div className="flex items-center gap-1 rounded-md px-2 py-1"
-                 style={{ background: '#2A0A0A', border: '1px solid #5A1A1A' }}>
-              <svg width="9" height="10" viewBox="0 0 9 10" fill="none">
-                <polygon points="4.5,10 0,0 9,0" fill="#FF4757"/>
-              </svg>
-              <span className="font-mono-num font-bold text-xs" style={{ color: '#FF4757' }}>
-                {Math.round(dDown)}
-              </span>
-              <span className="text-[9px] font-display uppercase tracking-wide" style={{ color: '#5A1A1A' }}>mmr</span>
-            </div>
-            {/* Porcentaje central */}
-            <span className="font-mono-num text-[10px] font-bold" style={{ color: meta.color, opacity: 0.6 }}>
-              {divPct}%
-            </span>
-            {/* Subir división */}
-            <div className="flex items-center gap-1 rounded-md px-2 py-1"
-                 style={{ background: '#0A2A15', border: '1px solid #1A5A2A' }}>
-              <svg width="9" height="10" viewBox="0 0 9 10" fill="none">
-                <polygon points="4.5,0 0,10 9,10" fill="#3DDB85"/>
-              </svg>
-              <span className="font-mono-num font-bold text-xs" style={{ color: '#3DDB85' }}>
-                {Math.round(dUp)}
-              </span>
-              <span className="text-[9px] font-display uppercase tracking-wide" style={{ color: '#1A5A2A' }}>mmr</span>
-            </div>
-          </div>
-          {/* Barra */}
-          <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: '#0D2240' }}>
-            <div className="absolute left-0 top-0 bottom-0 rounded-full"
-                 style={{ width: `${divPct}%`, background: `linear-gradient(90deg, ${meta.color}66, ${meta.color})` }} />
-          </div>
-        </div>
-      )}
 
       {/* Stats inferiores */}
       {(() => {
