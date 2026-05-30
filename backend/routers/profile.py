@@ -671,6 +671,33 @@ def _first(*vals):
     return None
 
 
+def _deep_find(obj, target_keys, depth=0):
+    """
+    Busca recursivamente la primera clave de `target_keys` y devuelve su valor numérico.
+    Acepta tanto {target: {"value": N}} como {target: N}. Robusto frente a cambios de
+    estructura en la respuesta de tracker.gg.
+    """
+    if depth > 6 or obj is None:
+        return None
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in target_keys:
+                if isinstance(v, dict) and v.get("value") is not None:
+                    return v.get("value")
+                if isinstance(v, (int, float)):
+                    return v
+        for v in obj.values():
+            r = _deep_find(v, target_keys, depth + 1)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for it in obj:
+            r = _deep_find(it, target_keys, depth + 1)
+            if r is not None:
+                return r
+    return None
+
+
 def _parse(raw):
     global _last_playlist_raw
     d    = raw.get("data", {})
@@ -726,9 +753,15 @@ def _parse(raw):
             "winPctVal":     _s(stats, "winPercentage", "value"),
             # MMR para bajar/subir de división: tracker.gg lo expone en
             # division.metadata.deltaDown/deltaUp; algunas respuestas usan stats.divisionDown/Up.value
-            "divisionDown":  _first(_s(stats, "divisionDown", "value"), _s(div, "metadata", "deltaDown")),
-            "divisionUp":    _first(_s(stats, "divisionUp",   "value"), _s(div, "metadata", "deltaUp")),
-            "globalRank":    _first(_s(stats, "rank", "value"), _s(stats, "rank", "metadata", "rank")),
+            "divisionDown":  _first(_s(stats, "divisionDown", "value"), _s(div, "metadata", "deltaDown"),
+                                    _deep_find(stats, {"deltaDown", "divisionDown"})),
+            "divisionUp":    _first(_s(stats, "divisionUp",   "value"), _s(div, "metadata", "deltaUp"),
+                                    _deep_find(stats, {"deltaUp", "divisionUp"})),
+            "globalRank":    _first(
+                _s(stats, "rank", "value"),
+                _s(stats, "rank", "metadata", "rank"),
+                _deep_find(stats, {"rank", "globalRank", "leaderboardRank"}),
+            ),
             # Percentil "Top X%": distintas respuestas lo ponen en sitios distintos
             "percentile":    _first(
                 _s(stats, "percentile", "value"),
@@ -736,6 +769,7 @@ def _parse(raw):
                 _s(stats, "rank", "metadata", "percentile"),
                 _s(tier, "metadata", "percentile"),
                 _s(div,  "metadata", "percentile"),
+                _deep_find(stats, {"percentile", "topPercent"}),
             ),
         })
 
