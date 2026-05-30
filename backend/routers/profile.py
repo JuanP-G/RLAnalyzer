@@ -270,6 +270,27 @@ def _scrape(username):
     return None
 
 
+# JS que lee, por cada tarjeta de playlist, el nombre y el bloque "#rank • Top X%"
+# tal y como lo pinta la web de RL Tracker (sección .leadership dentro de .playlist).
+_DOM_TOP_JS = r"""
+() => {
+  const out = [];
+  document.querySelectorAll('.playlist').forEach(c => {
+    const name = (c.querySelector('.name')?.textContent || '').trim();
+    const lead = (c.querySelector('.leadership')?.textContent || '').trim();
+    const rankM = lead.match(/#\s*([\d.,]+)/);
+    const topM  = lead.match(/top\s*([\d.]+)\s*%/i);
+    if (name) out.push({
+      name,
+      rank: rankM ? rankM[1].replace(/[.,]/g, '') : null,
+      top:  topM  ? topM[1] : null,
+    });
+  });
+  return out;
+}
+"""
+
+
 def _scrape_headless(username: str):
     """
     Fallback con Chromium headless (Playwright).
@@ -292,6 +313,7 @@ def _scrape_headless(username: str):
     )
     logger.info(f"Playwright headless: {url}")
 
+    dom_overlay = {}  # nombre_modo(lower) → {"rank": int|None, "top": float|None}
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -333,11 +355,28 @@ def _scrape_headless(username: str):
             except PWTimeout:
                 logger.warning("Playwright: networkidle timeout — usando datos capturados")
 
+            # Leer el "Top X%" y el rank tal cual los renderiza la web (lo que ve el usuario).
+            # La web los muestra en .playlist .leadership ("#453,494 • Top 5.0%").
+            try:
+                dom = page.evaluate(_DOM_TOP_JS)
+                for it in dom or []:
+                    nm = (it.get("name") or "").strip().lower()
+                    if not nm:
+                        continue
+                    dom_overlay[nm] = {
+                        "rank": int(it["rank"]) if it.get("rank") else None,
+                        "top":  float(it["top"]) if it.get("top") else None,
+                    }
+                if dom_overlay:
+                    logger.info(f"Playwright DOM: top%/rank de {len(dom_overlay)} modos")
+            except Exception as e:
+                logger.debug(f"Playwright DOM scrape de top%: {e}")
+
             browser.close()
 
         if captured:
             logger.info("Playwright: perfil obtenido correctamente")
-            return _parse(captured[0])
+            return _parse(captured[0], dom_overlay=dom_overlay)
 
         logger.warning("Playwright: sin respuestas API capturadas")
         return None
@@ -698,8 +737,9 @@ def _deep_find(obj, target_keys, depth=0):
     return None
 
 
-def _parse(raw):
+def _parse(raw, dom_overlay=None):
     global _last_playlist_raw
+    dom_overlay = dom_overlay or {}
     d    = raw.get("data", {})
     pi   = d.get("platformInfo", {})
     meta = d.get("metadata", {})
@@ -735,6 +775,8 @@ def _parse(raw):
         stats = seg.get("stats", {})
         tier  = stats.get("tier", {})
         div   = stats.get("division", {})
+        # "Top X%" y rank tal cual los renderiza la web (si se obtuvieron por Playwright)
+        ov = dom_overlay.get((smeta.get("name") or "").strip().lower(), {})
         playlists.append({
             "playlistId":    attrs.get("playlistId"),
             "season":        attrs.get("season"),
@@ -758,6 +800,7 @@ def _parse(raw):
             "divisionUp":    _first(_s(stats, "divisionUp",   "value"), _s(div, "metadata", "deltaUp"),
                                     _deep_find(stats, {"deltaUp", "divisionUp"})),
             "globalRank":    _first(
+                ov.get("rank"),
                 _s(stats, "rank", "value"),
                 _s(stats, "rank", "metadata", "rank"),
                 _deep_find(stats, {"rank", "globalRank", "leaderboardRank"}),
@@ -771,6 +814,9 @@ def _parse(raw):
                 _s(div,  "metadata", "percentile"),
                 _deep_find(stats, {"percentile", "topPercent"}),
             ),
+            # "Top X%" exacto leído del DOM de la web (preferente). Si no, el frontend
+            # lo calcula como 100 − percentile.
+            "topPercent":    ov.get("top"),
         })
 
     current = sorted(
