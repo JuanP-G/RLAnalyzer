@@ -270,27 +270,6 @@ def _scrape(username):
     return None
 
 
-# JS que lee, por cada tarjeta de playlist, el nombre y el bloque "#rank • Top X%"
-# tal y como lo pinta la web de RL Tracker (sección .leadership dentro de .playlist).
-_DOM_TOP_JS = r"""
-() => {
-  const out = [];
-  document.querySelectorAll('.playlist').forEach(c => {
-    const name = (c.querySelector('.name')?.textContent || '').trim();
-    const lead = (c.querySelector('.leadership')?.textContent || '').trim();
-    const rankM = lead.match(/#\s*([\d.,]+)/);
-    const topM  = lead.match(/top\s*([\d.]+)\s*%/i);
-    if (name) out.push({
-      name,
-      rank: rankM ? rankM[1].replace(/[.,]/g, '') : null,
-      top:  topM  ? topM[1] : null,
-    });
-  });
-  return out;
-}
-"""
-
-
 def _scrape_headless(username: str):
     """
     Fallback con Chromium headless (Playwright).
@@ -313,7 +292,6 @@ def _scrape_headless(username: str):
     )
     logger.info(f"Playwright headless: {url}")
 
-    dom_overlay = {}  # nombre_modo(lower) → {"rank": int|None, "top": float|None}
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -355,28 +333,11 @@ def _scrape_headless(username: str):
             except PWTimeout:
                 logger.warning("Playwright: networkidle timeout — usando datos capturados")
 
-            # Leer el "Top X%" y el rank tal cual los renderiza la web (lo que ve el usuario).
-            # La web los muestra en .playlist .leadership ("#453,494 • Top 5.0%").
-            try:
-                dom = page.evaluate(_DOM_TOP_JS)
-                for it in dom or []:
-                    nm = (it.get("name") or "").strip().lower()
-                    if not nm:
-                        continue
-                    dom_overlay[nm] = {
-                        "rank": int(it["rank"]) if it.get("rank") else None,
-                        "top":  float(it["top"]) if it.get("top") else None,
-                    }
-                if dom_overlay:
-                    logger.info(f"Playwright DOM: top%/rank de {len(dom_overlay)} modos")
-            except Exception as e:
-                logger.debug(f"Playwright DOM scrape de top%: {e}")
-
             browser.close()
 
         if captured:
             logger.info("Playwright: perfil obtenido correctamente")
-            return _parse(captured[0], dom_overlay=dom_overlay)
+            return _parse(captured[0])
 
         logger.warning("Playwright: sin respuestas API capturadas")
         return None
@@ -710,36 +671,8 @@ def _first(*vals):
     return None
 
 
-def _deep_find(obj, target_keys, depth=0):
-    """
-    Busca recursivamente la primera clave de `target_keys` y devuelve su valor numérico.
-    Acepta tanto {target: {"value": N}} como {target: N}. Robusto frente a cambios de
-    estructura en la respuesta de tracker.gg.
-    """
-    if depth > 6 or obj is None:
-        return None
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k in target_keys:
-                if isinstance(v, dict) and v.get("value") is not None:
-                    return v.get("value")
-                if isinstance(v, (int, float)):
-                    return v
-        for v in obj.values():
-            r = _deep_find(v, target_keys, depth + 1)
-            if r is not None:
-                return r
-    elif isinstance(obj, list):
-        for it in obj:
-            r = _deep_find(it, target_keys, depth + 1)
-            if r is not None:
-                return r
-    return None
-
-
-def _parse(raw, dom_overlay=None):
+def _parse(raw):
     global _last_playlist_raw
-    dom_overlay = dom_overlay or {}
     d    = raw.get("data", {})
     pi   = d.get("platformInfo", {})
     meta = d.get("metadata", {})
@@ -775,8 +708,11 @@ def _parse(raw, dom_overlay=None):
         stats = seg.get("stats", {})
         tier  = stats.get("tier", {})
         div   = stats.get("division", {})
-        # "Top X%" y rank tal cual los renderiza la web (si se obtuvieron por Playwright)
-        ov = dom_overlay.get((smeta.get("name") or "").strip().lower(), {})
+        # La racha trae el valor en positivo (magnitud) y el signo en metadata.type
+        ws_val  = _s(stats, "winStreak", "value")
+        ws_type = _s(stats, "winStreak", "metadata", "type")  # "win" | "loss"
+        if ws_val is not None and ws_type == "loss":
+            ws_val = -abs(ws_val)
         playlists.append({
             "playlistId":    attrs.get("playlistId"),
             "season":        attrs.get("season"),
@@ -789,34 +725,18 @@ def _parse(raw, dom_overlay=None):
             "mmr":           _s(stats, "rating",        "value"),
             "peak":          _s(stats, "peakRating",    "value"),
             "matchesPlayed": _s(stats, "matchesPlayed", "value"),
-            "winStreak":     _s(stats, "winStreak",     "value"),
+            "winStreak":     ws_val,
             "wins":          _s(stats, "wins",          "value"),
             "winPct":        _s(stats, "winPercentage", "displayValue"),
             "winPctVal":     _s(stats, "winPercentage", "value"),
-            # MMR para bajar/subir de división: tracker.gg lo expone en
-            # division.metadata.deltaDown/deltaUp; algunas respuestas usan stats.divisionDown/Up.value
-            "divisionDown":  _first(_s(stats, "divisionDown", "value"), _s(div, "metadata", "deltaDown"),
-                                    _deep_find(stats, {"deltaDown", "divisionDown"})),
-            "divisionUp":    _first(_s(stats, "divisionUp",   "value"), _s(div, "metadata", "deltaUp"),
-                                    _deep_find(stats, {"deltaUp", "divisionUp"})),
-            "globalRank":    _first(
-                ov.get("rank"),
-                _s(stats, "rank", "value"),
-                _s(stats, "rank", "metadata", "rank"),
-                _deep_find(stats, {"rank", "globalRank", "leaderboardRank"}),
-            ),
-            # Percentil "Top X%": distintas respuestas lo ponen en sitios distintos
-            "percentile":    _first(
-                _s(stats, "percentile", "value"),
-                _s(stats, "rank", "percentile"),
-                _s(stats, "rank", "metadata", "percentile"),
-                _s(tier, "metadata", "percentile"),
-                _s(div,  "metadata", "percentile"),
-                _deep_find(stats, {"percentile", "topPercent"}),
-            ),
-            # "Top X%" exacto leído del DOM de la web (preferente). Si no, el frontend
-            # lo calcula como 100 − percentile.
-            "topPercent":    ov.get("top"),
+            # MMR para bajar/subir de división: en division.metadata.deltaDown/deltaUp
+            "divisionDown":  _first(_s(div, "metadata", "deltaDown"), _s(stats, "divisionDown", "value")),
+            "divisionUp":    _first(_s(div, "metadata", "deltaUp"),   _s(stats, "divisionUp",   "value")),
+            # Rank global y percentil de habilidad: ambos en stats.rating (rating.rank /
+            # rating.percentile). OJO: tier/division/matchesPlayed tienen su PROPIO
+            # percentile, que NO es el ranking de skill — por eso hay que ser explícito.
+            "globalRank":    _first(_s(stats, "rating", "rank"), _s(stats, "rank", "value")),
+            "percentile":    _first(_s(stats, "rating", "percentile"), _s(stats, "percentile", "value")),
         })
 
     current = sorted(

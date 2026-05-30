@@ -220,13 +220,11 @@ function RankCard({ playlist, index }) {
 
       {/* Stats inferiores */}
       {(() => {
-        // "Top X%": preferimos el valor exacto que renderiza la web (topPercent, leído
-        // del DOM). Si no está, lo calculamos como 100 − percentile ("mejor que X%").
+        // tracker.gg da rating.percentile = "mejor que X% de jugadores" → el top en el
+        // que estás es 100 − percentile (coincide con el "Top X%" de la web).
         // Dorado solo si estás en el top ≤ 5%.
         const pct = playlist.percentile
-        const topPct = playlist.topPercent != null
-          ? playlist.topPercent
-          : (pct != null ? 100 - pct : null)
+        const topPct = pct != null ? 100 - pct : null
         const isGold = topPct != null && topPct <= 5
         const topStyle = topPct == null
           ? { color: '#C2D6F5' }
