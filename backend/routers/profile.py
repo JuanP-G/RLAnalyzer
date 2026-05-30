@@ -55,6 +55,7 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 _mem_profile      = {"data": None, "ts": 0}
 _mem_history      = {"data": None, "ts": 0}
 _api_blocked_until = 0  # bloquea solo la API (403/429); el scraping sigue disponible
+_last_playlist_raw = None  # último segmento playlist crudo (diagnóstico de rank/percentile)
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -494,11 +495,31 @@ def debug_profile_stats():
         results.append({
             "playlist": name,
             "stat_keys": list(stats.keys()),
-            "divisionDown_raw": stats.get("divisionDown"),
-            "divisionUp_raw":   stats.get("divisionUp"),
-            "rating_raw":       stats.get("rating", {}).get("value"),
+            "divisionDown_raw":   stats.get("divisionDown"),
+            "divisionUp_raw":     stats.get("divisionUp"),
+            "division_metadata":  (stats.get("division", {}) or {}).get("metadata"),
+            "rank_raw":           stats.get("rank"),
+            "percentile_raw":     stats.get("percentile"),
+            "rating_raw":         stats.get("rating", {}).get("value"),
         })
     return {"playlists": results}
+
+
+@router.get("/profile/raw-sample")
+def profile_raw_sample():
+    """
+    Diagnóstico: devuelve el primer segmento 'playlist' tal cual lo entrega tracker.gg
+    (incluido el camino de Playwright/scraping). Sirve para localizar dónde vienen
+    el rank global y el percentil 'Top X%'.
+    Abre /api/profile primero (para poblarlo) y luego /api/profile/raw-sample.
+    """
+    if _last_playlist_raw is None:
+        return {"note": "Sin datos aún. Abre /api/profile primero y vuelve a recargar esto."}
+    return {
+        "playlist_name": _last_playlist_raw.get("metadata", {}).get("name"),
+        "stat_keys":     list((_last_playlist_raw.get("stats") or {}).keys()),
+        "stats":         _last_playlist_raw.get("stats"),
+    }
 
 
 @router.get("/profile/diagnose")
@@ -642,11 +663,30 @@ def _s(d, *keys, default=None):
         return default
 
 
+def _first(*vals):
+    """Primer valor que no sea None (0 es válido)."""
+    for v in vals:
+        if v is not None:
+            return v
+    return None
+
+
 def _parse(raw):
+    global _last_playlist_raw
     d    = raw.get("data", {})
     pi   = d.get("platformInfo", {})
     meta = d.get("metadata", {})
     segs = d.get("segments", [])
+
+    # Diagnóstico: guarda el primer segmento playlist tal cual (para localizar rank/percentile)
+    try:
+        _last_playlist_raw = (
+            next((s for s in segs if s.get("type") == "playlist" and
+                  s.get("metadata", {}).get("currentSeason")), None)
+            or next((s for s in segs if s.get("type") == "playlist"), None)
+        )
+    except Exception:
+        pass
 
     overview_seg = next((s for s in segs if s.get("type") == "overview"), None)
     overview = {}
@@ -668,6 +708,11 @@ def _parse(raw):
         stats = seg.get("stats", {})
         tier  = stats.get("tier", {})
         div   = stats.get("division", {})
+        # La racha trae el valor en positivo (magnitud) y el signo en metadata.type
+        ws_val  = _s(stats, "winStreak", "value")
+        ws_type = _s(stats, "winStreak", "metadata", "type")  # "win" | "loss"
+        if ws_val is not None and ws_type == "loss":
+            ws_val = -abs(ws_val)
         playlists.append({
             "playlistId":    attrs.get("playlistId"),
             "season":        attrs.get("season"),
@@ -680,14 +725,18 @@ def _parse(raw):
             "mmr":           _s(stats, "rating",        "value"),
             "peak":          _s(stats, "peakRating",    "value"),
             "matchesPlayed": _s(stats, "matchesPlayed", "value"),
-            "winStreak":     _s(stats, "winStreak",     "value"),
+            "winStreak":     ws_val,
             "wins":          _s(stats, "wins",          "value"),
             "winPct":        _s(stats, "winPercentage", "displayValue"),
             "winPctVal":     _s(stats, "winPercentage", "value"),
-            "divisionDown":  _s(stats, "divisionDown",  "value"),
-            "divisionUp":    _s(stats, "divisionUp",    "value"),
-            "globalRank":    _s(stats, "rank",          "value"),
-            "percentile":    _s(stats, "percentile",    "value"),
+            # MMR para bajar/subir de división: en division.metadata.deltaDown/deltaUp
+            "divisionDown":  _first(_s(div, "metadata", "deltaDown"), _s(stats, "divisionDown", "value")),
+            "divisionUp":    _first(_s(div, "metadata", "deltaUp"),   _s(stats, "divisionUp",   "value")),
+            # Rank global y percentil de habilidad: ambos en stats.rating (rating.rank /
+            # rating.percentile). OJO: tier/division/matchesPlayed tienen su PROPIO
+            # percentile, que NO es el ranking de skill — por eso hay que ser explícito.
+            "globalRank":    _first(_s(stats, "rating", "rank"), _s(stats, "rank", "value")),
+            "percentile":    _first(_s(stats, "rating", "percentile"), _s(stats, "percentile", "value")),
         })
 
     current = sorted(

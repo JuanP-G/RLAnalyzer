@@ -47,7 +47,6 @@ const OVERVIEW_KEYS = [
   { key: 'shots',          label: 'Tiros',        color: '#C2D6F5' },
   { key: 'mvps',           label: 'MVPs',         color: '#FFB800' },
   { key: 'goalShotRatio',  label: 'Precisión',    color: '#C2D6F5' },
-  { key: 'winPercentage',  label: 'Win Rate',     color: '#C2D6F5' },
   { key: 'assists',        label: 'Asistencias',  color: '#C2D6F5' },
   { key: 'score',          label: 'Score total',  color: '#C2D6F5' },
 ]
@@ -60,13 +59,6 @@ function timeAgo(isoStr) {
   if (diff < 3600)  return `hace ${Math.floor(diff / 60)} min`
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`
   return `hace ${Math.floor(diff / 86400)} días`
-}
-
-function winRate(pl) {
-  if (pl.winPct) return pl.winPct
-  if (pl.wins != null && pl.matchesPlayed)
-    return `${((pl.wins / pl.matchesPlayed) * 100).toFixed(1)}%`
-  return null
 }
 
 // ── RankIcon: local SVG con fallback a URL remota ─────────────────────────────
@@ -143,14 +135,33 @@ function ErrorBox({ error, onRetry }) {
   )
 }
 
+// ── DivisionDelta: MMR para subir (▲) / bajar (▼) de división, estilo RL Tracker ──
+// Horizontal (▲subir  ▼bajar), centrado en el hueco a la derecha del MMR. Sin texto.
+function DivisionDelta({ up, down }) {
+  if (up == null && down == null) return null
+  return (
+    <div className="flex items-center gap-2.5" title="MMR para subir / bajar de división">
+      {up != null && (
+        <span className="flex items-center gap-1 leading-none">
+          <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,0 8,8 0,8" fill="#3DDB85"/></svg>
+          <span className="font-mono-num font-bold text-sm" style={{ color: '#3DDB85' }}>{Math.round(up)}</span>
+        </span>
+      )}
+      {down != null && (
+        <span className="flex items-center gap-1 leading-none">
+          <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,8 8,0 0,0" fill="#FF4757"/></svg>
+          <span className="font-mono-num font-bold text-sm" style={{ color: '#FF4757' }}>{Math.round(down)}</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ── RankCard ─────────────────────────────────────────────────────────────────
 function RankCard({ playlist, index }) {
   const meta    = PLAYLIST_META[playlist.playlistId] || { label: playlist.name, color: '#7B91B0' }
-  const wr      = winRate(playlist)
   const dDown   = playlist.divisionDown
   const dUp     = playlist.divisionUp
-  const hasProg = dDown != null && dUp != null && (dDown + dUp) > 0
-  const divPct  = hasProg ? Math.round((dDown / (dDown + dUp)) * 100) : null
   const streak  = playlist.winStreak
   const streakStr   = streak == null ? null : streak > 0 ? `+${streak}` : streak < 0 ? `${streak}` : '0'
   const streakColor = streak > 0 ? '#3DDB85' : streak < 0 ? '#FF4757' : '#7B91B0'
@@ -188,75 +199,58 @@ function RankCard({ playlist, index }) {
             <p className="text-gray-400 text-xs mt-0.5">{playlist.divisionName}</p>
           )}
           {playlist.mmr != null && (
-            <p className="font-mono-num font-bold text-xl leading-tight mt-1.5" style={{ color: meta.color }}>
-              {Math.round(playlist.mmr)}{' '}
-              <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
-            </p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <p className="font-mono-num font-bold text-xl leading-none flex-shrink-0" style={{ color: meta.color }}>
+                {Math.round(playlist.mmr)}{' '}
+                <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
+              </p>
+              {/* Flechas centradas en el espacio que queda entre el MMR y el borde derecho */}
+              <div className="flex-1 flex justify-center">
+                <DivisionDelta up={dUp} down={dDown} />
+              </div>
+            </div>
           )}
           {playlist.peak != null && (
-            <p className="text-gray-500 text-[10px] mt-0.5 font-mono-num">
+            <p className="text-gray-500 text-[10px] mt-1 font-mono-num">
               Pico: {Math.round(playlist.peak)} MMR
             </p>
           )}
         </div>
       </div>
 
-      {/* Barra de progreso de división + MMR flechas */}
-      {hasProg && (
-        <div className="px-4 pb-3">
-          {/* Flechas MMR arriba/abajo */}
-          <div className="flex items-center justify-between mb-2">
-            {/* Bajar división */}
-            <div className="flex items-center gap-1 rounded-md px-2 py-1"
-                 style={{ background: '#2A0A0A', border: '1px solid #5A1A1A' }}>
-              <svg width="9" height="10" viewBox="0 0 9 10" fill="none">
-                <polygon points="4.5,10 0,0 9,0" fill="#FF4757"/>
-              </svg>
-              <span className="font-mono-num font-bold text-xs" style={{ color: '#FF4757' }}>
-                {Math.round(dDown)}
-              </span>
-              <span className="text-[9px] font-display uppercase tracking-wide" style={{ color: '#5A1A1A' }}>mmr</span>
-            </div>
-            {/* Porcentaje central */}
-            <span className="font-mono-num text-[10px] font-bold" style={{ color: meta.color, opacity: 0.6 }}>
-              {divPct}%
-            </span>
-            {/* Subir división */}
-            <div className="flex items-center gap-1 rounded-md px-2 py-1"
-                 style={{ background: '#0A2A15', border: '1px solid #1A5A2A' }}>
-              <svg width="9" height="10" viewBox="0 0 9 10" fill="none">
-                <polygon points="4.5,0 0,10 9,10" fill="#3DDB85"/>
-              </svg>
-              <span className="font-mono-num font-bold text-xs" style={{ color: '#3DDB85' }}>
-                {Math.round(dUp)}
-              </span>
-              <span className="text-[9px] font-display uppercase tracking-wide" style={{ color: '#1A5A2A' }}>mmr</span>
-            </div>
-          </div>
-          {/* Barra */}
-          <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: '#0D2240' }}>
-            <div className="absolute left-0 top-0 bottom-0 rounded-full"
-                 style={{ width: `${divPct}%`, background: `linear-gradient(90deg, ${meta.color}66, ${meta.color})` }} />
-          </div>
-        </div>
-      )}
-
       {/* Stats inferiores */}
-      <div className="grid grid-cols-4 px-3 py-2.5 mt-auto" style={{ borderTop: '1px solid #0D2240' }}>
-        {[
+      {(() => {
+        // tracker.gg da rating.percentile = "mejor que X% de jugadores" → el top en el
+        // que estás es 100 − percentile (coincide con el "Top X%" de la web).
+        // Dorado solo si estás en el top ≤ 5%.
+        const pct = playlist.percentile
+        const topPct = pct != null ? 100 - pct : null
+        const isGold = topPct != null && topPct <= 5
+        const topStyle = topPct == null
+          ? { color: '#C2D6F5' }
+          : isGold
+            ? { color: '#FFC93C', textShadow: '0 0 8px rgba(255,184,0,0.6)' }
+            : { color: '#C2D6F5' }
+        const rank = playlist.globalRank
+        const cells = [
           { label: 'Partidas', value: playlist.matchesPlayed },
-          { label: 'Win %',    value: wr },
-          { label: 'Top',      value: playlist.percentile != null ? `${playlist.percentile.toFixed(1)}%` : null },
+          { label: 'Rank',     value: rank != null ? `#${Math.round(rank).toLocaleString('es-ES')}` : null },
+          { label: 'Top',      value: topPct != null ? `${topPct.toFixed(1)}%` : null, style: topStyle },
           { label: 'Racha',    value: streakStr, style: streakStr ? { color: streakColor } : undefined },
-        ].map(({ label, value, style }) => (
-          <div key={label} className="text-center">
-            <p className="text-gray-500 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
-            <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#C2D6F5' }}>
-              {value ?? '—'}
-            </p>
+        ]
+        return (
+          <div className="grid grid-cols-4 px-3 py-2.5 mt-auto" style={{ borderTop: '1px solid #0D2240' }}>
+            {cells.map(({ label, value, style }) => (
+              <div key={label} className="text-center">
+                <p className="text-gray-500 text-[9px] uppercase tracking-wider font-display font-semibold">{label}</p>
+                <p className="font-mono-num text-sm font-bold mt-0.5" style={style || { color: '#C2D6F5' }}>
+                  {value ?? '—'}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
     </div>
   )
 }
