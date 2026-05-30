@@ -47,7 +47,6 @@ const OVERVIEW_KEYS = [
   { key: 'shots',          label: 'Tiros',        color: '#C2D6F5' },
   { key: 'mvps',           label: 'MVPs',         color: '#FFB800' },
   { key: 'goalShotRatio',  label: 'Precisión',    color: '#C2D6F5' },
-  { key: 'winPercentage',  label: 'Win Rate',     color: '#C2D6F5' },
   { key: 'assists',        label: 'Asistencias',  color: '#C2D6F5' },
   { key: 'score',          label: 'Score total',  color: '#C2D6F5' },
 ]
@@ -137,23 +136,22 @@ function ErrorBox({ error, onRetry }) {
 }
 
 // ── DivisionDelta: MMR para subir (▲) / bajar (▼) de división, estilo RL Tracker ──
-// Apilado en vertical, a la derecha del MMR. Sin "mmr" (se sobreentiende).
+// Horizontal (▲subir  ▼bajar), centrado en el hueco a la derecha del MMR. Sin texto.
 function DivisionDelta({ up, down }) {
   if (up == null && down == null) return null
   return (
-    <div className="flex flex-col gap-0.5 items-end flex-shrink-0"
-         title="MMR para subir / bajar de división">
+    <div className="flex items-center gap-2.5" title="MMR para subir / bajar de división">
       {up != null && (
-        <div className="flex items-center gap-1 leading-none">
+        <span className="flex items-center gap-1 leading-none">
           <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,0 8,8 0,8" fill="#3DDB85"/></svg>
-          <span className="font-mono-num font-bold text-xs" style={{ color: '#3DDB85' }}>{Math.round(up)}</span>
-        </div>
+          <span className="font-mono-num font-bold text-sm" style={{ color: '#3DDB85' }}>{Math.round(up)}</span>
+        </span>
       )}
       {down != null && (
-        <div className="flex items-center gap-1 leading-none">
+        <span className="flex items-center gap-1 leading-none">
           <svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,8 8,0 0,0" fill="#FF4757"/></svg>
-          <span className="font-mono-num font-bold text-xs" style={{ color: '#FF4757' }}>{Math.round(down)}</span>
-        </div>
+          <span className="font-mono-num font-bold text-sm" style={{ color: '#FF4757' }}>{Math.round(down)}</span>
+        </span>
       )}
     </div>
   )
@@ -201,12 +199,15 @@ function RankCard({ playlist, index }) {
             <p className="text-gray-400 text-xs mt-0.5">{playlist.divisionName}</p>
           )}
           {playlist.mmr != null && (
-            <div className="flex items-end justify-between gap-2 mt-1.5">
-              <p className="font-mono-num font-bold text-xl leading-none" style={{ color: meta.color }}>
+            <div className="flex items-center gap-2 mt-1.5">
+              <p className="font-mono-num font-bold text-xl leading-none flex-shrink-0" style={{ color: meta.color }}>
                 {Math.round(playlist.mmr)}{' '}
                 <span className="text-xs font-sans font-normal text-gray-400">MMR</span>
               </p>
-              <DivisionDelta up={dUp} down={dDown} />
+              {/* Flechas centradas en el espacio que queda entre el MMR y el borde derecho */}
+              <div className="flex-1 flex justify-center">
+                <DivisionDelta up={dUp} down={dDown} />
+              </div>
             </div>
           )}
           {playlist.peak != null && (

@@ -55,6 +55,7 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 _mem_profile      = {"data": None, "ts": 0}
 _mem_history      = {"data": None, "ts": 0}
 _api_blocked_until = 0  # bloquea solo la API (403/429); el scraping sigue disponible
+_last_playlist_raw = None  # último segmento playlist crudo (diagnóstico de rank/percentile)
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -504,6 +505,23 @@ def debug_profile_stats():
     return {"playlists": results}
 
 
+@router.get("/profile/raw-sample")
+def profile_raw_sample():
+    """
+    Diagnóstico: devuelve el primer segmento 'playlist' tal cual lo entrega tracker.gg
+    (incluido el camino de Playwright/scraping). Sirve para localizar dónde vienen
+    el rank global y el percentil 'Top X%'.
+    Abre /api/profile primero (para poblarlo) y luego /api/profile/raw-sample.
+    """
+    if _last_playlist_raw is None:
+        return {"note": "Sin datos aún. Abre /api/profile primero y vuelve a recargar esto."}
+    return {
+        "playlist_name": _last_playlist_raw.get("metadata", {}).get("name"),
+        "stat_keys":     list((_last_playlist_raw.get("stats") or {}).keys()),
+        "stats":         _last_playlist_raw.get("stats"),
+    }
+
+
 @router.get("/profile/diagnose")
 def diagnose_profile():
     """
@@ -654,10 +672,21 @@ def _first(*vals):
 
 
 def _parse(raw):
+    global _last_playlist_raw
     d    = raw.get("data", {})
     pi   = d.get("platformInfo", {})
     meta = d.get("metadata", {})
     segs = d.get("segments", [])
+
+    # Diagnóstico: guarda el primer segmento playlist tal cual (para localizar rank/percentile)
+    try:
+        _last_playlist_raw = (
+            next((s for s in segs if s.get("type") == "playlist" and
+                  s.get("metadata", {}).get("currentSeason")), None)
+            or next((s for s in segs if s.get("type") == "playlist"), None)
+        )
+    except Exception:
+        pass
 
     overview_seg = next((s for s in segs if s.get("type") == "overview"), None)
     overview = {}
