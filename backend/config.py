@@ -1,8 +1,19 @@
 # ============================================================
 #  config.py — RLAnalyzer
-#  ÚNICO archivo que debes editar para configurar la app.
-#  Si compartes la app con alguien, solo tiene que cambiar
-#  los valores de esta sección.
+#
+#  NO necesitas editar este archivo para usar la app: el jugador
+#  y la carpeta de replays se configuran desde dentro de la app
+#  (botón de Ajustes) y se guardan en la base de datos.
+#
+#  Estos valores son solo los POR DEFECTO / de respaldo: se usan
+#  en el primer arranque (hasta que guardas algo en Ajustes) o si
+#  la base de datos no tiene aún ese ajuste. Editarlos aquí solo
+#  sirve si quieres que la app arranque ya configurada sin abrir
+#  Ajustes (p. ej. para tu propio entorno de desarrollo).
+#
+#  Excepción: DB_PATH y BACKEND_PORT sí viven aquí de forma
+#  permanente (la ubicación de la BD y el puerto del servidor no
+#  pueden guardarse dentro de la propia BD).
 # ============================================================
 
 # Tu nombre exacto tal como aparece en Rocket League

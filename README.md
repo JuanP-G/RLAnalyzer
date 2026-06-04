@@ -48,17 +48,22 @@ cd RLAnalyzer
 
 ### 2. Configura tus datos
 
-Lo más cómodo: arranca la app y pulsa el **botón de Ajustes** (rueda dentada, arriba a la
-izquierda) para fijar tu **jugador principal** y la **carpeta de replays** (con selector de
-carpeta nativo). Los cambios se aplican al instante, sin reiniciar.
+**Se configura desde dentro de la app**, no editando código: arranca RLAnalyzer y pulsa el
+**botón de Ajustes** (rueda dentada, arriba a la izquierda) para fijar tu **jugador principal** y
+la **carpeta de replays** (con selector de carpeta nativo). Se guarda en la base de datos, se
+aplica al instante (sin reiniciar) y **queda guardado para siempre**.
 
-`backend/config.py` solo contiene ahora los **valores por defecto** (los que se usan hasta que
-guardas algo en Ajustes):
-
-```python
-PLAYER_NAME    = "TuNombreEnRocketLeague"   # nombre exacto en el juego
-REPLAYS_FOLDER = r"C:\Users\TU_USUARIO\Documents\My Games\Rocket League\TAGame\DemosEpic"
-```
+> **Sobre `backend/config.py`:** ya **no hace falta tocarlo**. Solo contiene los valores **por
+> defecto / de respaldo** que se usan en el primer arranque (hasta que guardas algo en Ajustes).
+> Editarlo es opcional y sirve únicamente si quieres que la app arranque ya 100% configurada sin
+> abrir Ajustes (por ejemplo, en el entorno del desarrollador) o como red de seguridad. La forma
+> recomendada es Ajustes.
+>
+> ```python
+> PLAYER_NAME    = "TuNombreEnRocketLeague"   # solo el valor por defecto
+> REPLAYS_FOLDER = r"C:\Users\TU_USUARIO\Documents\My Games\Rocket League\TAGame\DemosEpic"
+> ```
+> (`DB_PATH` y `BACKEND_PORT` sí viven siempre aquí: no pueden guardarse dentro de la propia BD.)
 
 ### 3. Ejecuta el setup
 
