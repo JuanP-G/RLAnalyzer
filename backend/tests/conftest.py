@@ -45,12 +45,17 @@ def db(TestSessionLocal):
 
 
 @pytest.fixture(autouse=True)
-def _clean_tables(engine):
-    """Limpia las tablas tras cada test (hijos antes que padres por FK)."""
+def _clean_tables(db):
+    """
+    Limpia las tablas tras cada test usando la MISMA sesión del test, de modo que
+    también descarta filas no commiteadas (p. ej. make_replay(commit=False)).
+    Hijos antes que padres por la FK.
+    """
     yield
-    with engine.begin() as conn:
-        conn.execute(models.PlayerStat.__table__.delete())
-        conn.execute(models.Replay.__table__.delete())
+    db.rollback()  # descarta lo no commiteado del test
+    db.query(models.PlayerStat).delete()
+    db.query(models.Replay).delete()
+    db.commit()
 
 
 @pytest.fixture

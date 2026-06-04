@@ -19,6 +19,8 @@ py -m pytest tests -v
 ```
 Marcadores: `py -m pytest tests -m unit` (lógica pura, rápido) y `-m api` (endpoints).
 
+Cobertura: `py -m pytest --cov=. --cov-report=term-missing` (requiere `pytest-cov`, ya en `requirements-dev.txt`).
+
 **Cobertura actual (47 tests):**
 - **Unitarios:** `stats._metric_value`/`_avg`/`_is_abnormal`/`_parse_date`, `database._playlist_to_category`,
   `players._group_stats`, `profile._parse`/`_first`/`_extract_json_at` (incl. que el percentil/rank salen de

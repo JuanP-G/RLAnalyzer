@@ -1,7 +1,7 @@
 """Tests de /api/players (BD temporal en memoria)."""
 import pytest
 
-from factories import make_replay, make_player, ME
+from tests.factories import make_replay, make_player, ME
 
 pytestmark = pytest.mark.api
 

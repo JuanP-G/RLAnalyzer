@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from factories import make_replay, make_player
+from tests.factories import make_replay, make_player
 
 pytestmark = pytest.mark.api
 
@@ -80,3 +80,19 @@ def test_summary(client, db):
     s = client.get("/api/stats/summary").json()
     assert s["total_replays"] == 1
     assert s["wins"] == 1
+
+
+def test_me(client, db):
+    make_replay(db, result="win")   # yo: goals=2 (default_match)
+    make_replay(db, result="loss")
+    me = client.get("/api/stats/me").json()
+    assert me["overall"]["count"] == 2
+    assert me["overall"]["goals"] == 2.0
+    assert me["wins"]["count"] == 1
+    assert me["losses"]["count"] == 1
+
+
+def test_me_empty(client):
+    me = client.get("/api/stats/me").json()
+    assert me["overall"] is None   # sin partidas → None en cada tramo
+    assert me["wins"] is None

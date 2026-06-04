@@ -1,12 +1,23 @@
 """Tests de /api/replays/{id}/frames con mocking (sin rrrocket)."""
 import pytest
 
-from factories import make_replay
+from tests.factories import make_replay
 
 pytestmark = pytest.mark.api
 
 
-def test_frames_no_file(client, db):
+def test_frames_no_file_path(client, db):
+    # Rama replays.py:284 — file_path es None (distinta del 404 por archivo inexistente)
+    r = make_replay(db, commit=False)
+    r.file_path = None
+    db.commit()
+    resp = client.get(f"/api/replays/{r.id}/frames")
+    assert resp.status_code == 404
+    assert "Ruta de archivo" in resp.json()["detail"]
+
+
+def test_frames_file_missing(client, db):
+    # Rama replays.py:286 — file_path existe pero el archivo no está en disco
     r = make_replay(db, file_path="C:/falta.replay")
     assert client.get(f"/api/replays/{r.id}/frames").status_code == 404
 

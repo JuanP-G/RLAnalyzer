@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from factories import make_replay
+from tests.factories import make_replay
 
 pytestmark = pytest.mark.api
 
@@ -20,25 +20,33 @@ def test_list_total_and_order(client, db):
 def test_filter_result(client, db):
     make_replay(db, result="win")
     make_replay(db, result="loss")
-    assert client.get("/api/replays?result=win").json()["total"] == 1
+    data = client.get("/api/replays?result=win").json()
+    assert data["total"] == 1
+    assert data["replays"][0]["result"] == "win"   # el devuelto es el correcto
 
 
 def test_filter_team_size(client, db):
     make_replay(db, team_size=2)
     make_replay(db, team_size=3)
-    assert client.get("/api/replays?team_size=3").json()["total"] == 1
+    data = client.get("/api/replays?team_size=3").json()
+    assert data["total"] == 1
+    assert data["replays"][0]["team_size"] == 3
 
 
 def test_filter_favorite(client, db):
     make_replay(db, is_favorite=True)
     make_replay(db, is_favorite=False)
-    assert client.get("/api/replays?favorite=1").json()["total"] == 1
+    data = client.get("/api/replays?favorite=1").json()
+    assert data["total"] == 1
+    assert data["replays"][0]["is_favorite"] is True
 
 
 def test_filter_category(client, db):
     make_replay(db, game_category="Ranked")
     make_replay(db, game_category="Casual")
-    assert client.get("/api/replays?game_category=Casual").json()["total"] == 1
+    data = client.get("/api/replays?game_category=Casual").json()
+    assert data["total"] == 1
+    assert data["replays"][0]["game_category"] == "Casual"
 
 
 def test_pagination(client, db):
@@ -74,3 +82,10 @@ def test_patch_favorite(client, db):
 
 def test_patch_favorite_404(client):
     assert client.patch("/api/replays/99999/favorite", json={"value": True}).status_code == 404
+
+
+def test_status(client):
+    s = client.get("/api/status").json()
+    assert s["status"] == "ok"
+    assert "player_name" in s
+    assert "folder_exists" in s

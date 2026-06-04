@@ -1,7 +1,7 @@
 """Tests de /api/replays/{id}/ballchasing con mocking (sin red ni disco)."""
 import pytest
 
-from factories import make_replay
+from tests.factories import make_replay
 
 pytestmark = pytest.mark.api
 
