@@ -1,0 +1,50 @@
+{
+  "data": {
+    "platformInfo": {
+      "platformSlug": "epic",
+      "platformUserHandle": "GustoffotsuG",
+      "avatarUrl": "https://example.com/avatar.png"
+    },
+    "metadata": {
+      "currentSeason": 36,
+      "lastUpdated": { "value": "2026-05-30T13:50:45.334Z" }
+    },
+    "segments": [
+      {
+        "type": "overview",
+        "attributes": {},
+        "metadata": {},
+        "stats": {
+          "wins": { "value": 5000, "displayValue": "5,000", "metadata": { "name": "Wins" } },
+          "goals": { "value": 12000, "displayValue": "12,000", "metadata": { "name": "Goals" } }
+        }
+      },
+      {
+        "type": "playlist",
+        "attributes": { "playlistId": 10, "season": 36 },
+        "metadata": { "name": "Ranked Duel 1v1", "currentSeason": true },
+        "stats": {
+          "tier": { "value": 13, "percentile": 91.0, "metadata": { "name": "Diamond I", "iconUrl": "https://example.com/d1.png" } },
+          "division": { "value": 1, "percentile": 26.0, "metadata": { "name": "Division II", "deltaUp": 18, "deltaDown": 1 } },
+          "matchesPlayed": { "value": 7, "percentile": 65.0, "metadata": {} },
+          "winStreak": { "value": 1, "displayValue": "-1", "metadata": { "type": "loss" } },
+          "rating": { "value": 820, "rank": 629227, "percentile": 92.0, "metadata": { "tierName": "Diamond I" } },
+          "peakRating": { "value": 820, "metadata": {} }
+        }
+      },
+      {
+        "type": "playlist",
+        "attributes": { "playlistId": 11, "season": 36 },
+        "metadata": { "name": "Ranked Doubles 2v2", "currentSeason": true },
+        "stats": {
+          "tier": { "value": 18, "percentile": 94.0, "metadata": { "name": "Champion III", "iconUrl": "https://example.com/c3.png" } },
+          "division": { "value": 1, "percentile": 24.0, "metadata": { "name": "Division II", "deltaUp": 25, "deltaDown": 8 } },
+          "matchesPlayed": { "value": 413, "percentile": 80.0, "metadata": {} },
+          "winStreak": { "value": 3, "displayValue": "3", "metadata": { "type": "win" } },
+          "rating": { "value": 1343, "rank": 453494, "percentile": 95.0, "metadata": { "tierName": "Champion III" } },
+          "peakRating": { "value": 1493, "metadata": {} }
+        }
+      }
+    ]
+  }
+}

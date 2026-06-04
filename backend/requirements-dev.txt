@@ -1,0 +1,3 @@
+# Dependencias solo para ejecutar la batería de tests (no necesarias en producción)
+pytest>=8.0
+httpx>=0.27        # requerido por fastapi.testclient (Starlette TestClient)

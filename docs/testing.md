@@ -4,6 +4,35 @@
 
 ---
 
+## 0. Tests automatizados (pytest)
+
+Batería automatizada del backend en `backend/tests/`. Se ejecuta sin red, sin tocar la BD real
+(`data/rl_data.db`) ni la carpeta de replays, y sin binarios nativos (subtr_actor/rrrocket):
+usa SQLite **en memoria** + `dependency_overrides` de `get_db`, y mocking para frames/Ballchasing.
+
+**Ejecutar (Windows):**
+```powershell
+cd backend
+py -m pip install -r requirements-dev.txt
+py -m pytest tests -v
+# o el script:  .\run_tests.ps1
+```
+Marcadores: `py -m pytest tests -m unit` (lógica pura, rápido) y `-m api` (endpoints).
+
+**Cobertura actual (47 tests):**
+- **Unitarios:** `stats._metric_value`/`_avg`/`_is_abnormal`/`_parse_date`, `database._playlist_to_category`,
+  `players._group_stats`, `profile._parse`/`_first`/`_extract_json_at` (incl. que el percentil/rank salen de
+  `rating.*`, no de `tier.*`, y la racha negativa en derrotas).
+- **API:** `/api/replays` (filtros, orden, paginación, detalle con ambos equipos, 404, PATCH favorito),
+  `/api/stats/analysis` (medias por rol; anómalas excluidas de medias pero contadas en win rate),
+  `/api/stats/dashboard` (kpis; recent_form ignora el filtro result), `/glossary`, `/analysis/filters`,
+  `/summary`, `/api/players/{name}/summary` (with/against), `/ballchasing` y `/frames` (mockeados).
+
+Infra: `backend/conftest.py` (fixtures `engine`/`db`/`client`), `backend/tests/factories.py`
+(`make_replay`/`make_player`), `backend/tests/fixtures/tracker_sample.json`.
+
+---
+
 ## 1. Pruebas manuales ejecutadas (2026-05-26)
 
 ### 1.1 Backend — arranque y estado
