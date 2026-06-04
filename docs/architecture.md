@@ -72,7 +72,10 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 | `/viewer/:id` | `ReplayViewer.jsx` | Visor 3D Three.js + visor embebido de Ballchasing |
 | `/profile` | `Profile.jsx` | Rangos, MMR, historial tracker.gg |
 | `/players/:name` | `PlayerHistory.jsx` | Récord con/contra un jugador |
-| `/settings` | `Settings.jsx` | Jugador principal (multi-perfil) y carpeta de replays |
+
+**Ajustes** no es una ruta: es un **modal** (`components/SettingsModal.jsx`) que se abre con el botón de
+engranaje del Sidebar. Contiene secciones (Perfil/Replays/Avanzado) pensadas para crecer (apariencia,
+privacidad, actualizaciones…). Jugador principal (multi-perfil) y carpeta de replays se editan ahí.
 
 **Cliente HTTP (`api.js`):** caché en memoria por URL con TTL 60s. Todas las peticiones van a `http://localhost:8000`.
 

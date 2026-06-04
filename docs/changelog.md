@@ -11,7 +11,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 - **Tests automatizados del backend** (`backend/tests/`, 58 con pytest): SQLite en memoria +
   `dependency_overrides`, sin red ni binarios nativos. Unitarios (stats/players/profile) y de API
   (replays, stats, players, settings, ballchasing/frames mockeados). `requirements-dev.txt`, `run_tests.ps1`.
-- **Pantalla de Ajustes** (`/settings`, `frontend/src/pages/Settings.jsx`)
+- **Ajustes en modal** (`frontend/src/components/SettingsModal.jsx`), abierto desde el botón de
+  engranaje del Sidebar (no es una página). Estructurado en secciones (Perfil/Replays/Avanzado)
+  preparado para crecer (apariencia, privacidad, actualizaciones…)
   - **Jugador principal configurable** (multi-perfil): cambiarlo re-etiqueta `is_me` en `player_stats`
     y refresca el perfil; input con autocompletado de jugadores vistos
   - **Carpeta de replays** seleccionable con diálogo nativo de Electron (`selectFolder` vía IPC);

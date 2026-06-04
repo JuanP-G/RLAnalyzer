@@ -78,10 +78,9 @@ const links = [
   { to: '/compare',  label: 'Comparar',   Icon: IconCompare },
   { to: '/analysis', label: 'Análisis',   Icon: IconAnalysis },
   { to: '/viewer',   label: 'Visor 3D',   Icon: IconViewer3D },
-  { to: '/settings', label: 'Ajustes',    Icon: IconSettings },
 ]
 
-export default function Sidebar({ playerName, folderOk }) {
+export default function Sidebar({ playerName, folderOk, onOpenSettings }) {
   return (
     <aside
       className="w-56 h-full flex-shrink-0 flex flex-col"
@@ -161,9 +160,9 @@ export default function Sidebar({ playerName, folderOk }) {
         ))}
       </nav>
 
-      {/* Estado watcher */}
-      <div className="px-4 py-4" style={{ borderTop: '1px solid #122A4D' }}>
-        <div className="flex items-center gap-2">
+      {/* Estado watcher + botón de Ajustes */}
+      <div className="px-4 py-4 flex items-center justify-between gap-2" style={{ borderTop: '1px solid #122A4D' }}>
+        <div className="flex items-center gap-2 min-w-0">
           <span
             className={`w-2 h-2 rounded-full flex-shrink-0 ${folderOk ? 'animate-glow' : ''}`}
             style={{
@@ -171,10 +170,20 @@ export default function Sidebar({ playerName, folderOk }) {
               boxShadow: folderOk ? '0 0 6px rgba(61,219,133,0.7)' : 'none',
             }}
           />
-          <span className="text-xs" style={{ color: '#284F74' }}>
+          <span className="text-xs truncate" style={{ color: '#284F74' }}>
             {folderOk ? 'Watcher activo' : 'Carpeta no encontrada'}
           </span>
         </div>
+        <button
+          onClick={onOpenSettings}
+          title="Ajustes"
+          className="flex-shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-rl-blue transition-all hover:rotate-45"
+          style={{ background: 'transparent', border: '1px solid transparent' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,168,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(0,168,255,0.2)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
+        >
+          <IconSettings />
+        </button>
       </div>
     </aside>
   )

@@ -11,11 +11,12 @@ import Profile from './pages/Profile'
 import PlayerHistory from './pages/PlayerHistory'
 import Analysis from './pages/Analysis'
 import Compare from './pages/Compare'
-import Settings from './pages/Settings'
+import SettingsModal from './components/SettingsModal'
 import { api } from './api'
 
 export default function App() {
   const [status, setStatus] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const refreshStatus = () => api.status().then(setStatus).catch(() => {})
 
@@ -33,6 +34,7 @@ export default function App() {
         <Sidebar
           playerName={status?.player_name}
           folderOk={status?.folder_exists ?? false}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
         {/* Cada página gestiona su propio padding y scroll */}
@@ -47,10 +49,13 @@ export default function App() {
             <Route path="/viewer/:id"      element={<ReplayViewer />} />
             <Route path="/profile"        element={<Profile />} />
             <Route path="/players/:name"  element={<PlayerHistory />} />
-            <Route path="/settings"       element={<Settings onSaved={refreshStatus} />} />
           </Routes>
         </main>
       </div>
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} onSaved={refreshStatus} />
+      )}
     </div>
   )
 }
