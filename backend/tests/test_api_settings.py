@@ -54,3 +54,7 @@ def test_put_replays_folder(client, db, monkeypatch):
 
 def test_put_empty_player_name_400(client):
     assert client.put("/api/settings", json={"player_name": "  "}).status_code == 400
+
+
+def test_put_empty_folder_400(client):
+    assert client.put("/api/settings", json={"replays_folder": "   "}).status_code == 400

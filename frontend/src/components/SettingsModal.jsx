@@ -50,6 +50,8 @@ export default function SettingsModal({ onClose, onSaved }) {
 
   const save = async () => {
     if (!dirty) return
+    if (!name.trim())   { setMsg({ type: 'err', text: 'El jugador no puede estar vacío.' });  return }
+    if (!folder.trim()) { setMsg({ type: 'err', text: 'La carpeta no puede estar vacía.' }); return }
     setSaving(true); setMsg(null)
     const payload = {}
     if (name.trim() !== (data.player_name || ''))      payload.player_name = name.trim()

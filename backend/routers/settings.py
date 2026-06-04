@@ -129,6 +129,8 @@ def update_settings(payload: SettingsUpdate):
 
     if payload.replays_folder is not None:
         folder = payload.replays_folder.strip()
+        if not folder:
+            raise HTTPException(status_code=400, detail="La carpeta de replays no puede estar vacía")
         settings_store.set(settings_store.KEY_REPLAYS_FOLDER, folder)
         _apply_folder_change()
         changed["replays_folder"] = folder

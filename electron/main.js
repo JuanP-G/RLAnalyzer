@@ -6,6 +6,13 @@ const http                           = require('http')
 
 const ROOT = path.join(__dirname, '..')
 
+// Puertos centralizados (un único sitio; overridables por entorno).
+// Deben coincidir con backend/config.py (BACKEND_PORT) y frontend/vite.config.js.
+const BACKEND_PORT  = Number(process.env.RL_BACKEND_PORT)  || 8000
+const FRONTEND_PORT = Number(process.env.RL_FRONTEND_PORT) || 5173
+const BACKEND_URL   = `http://localhost:${BACKEND_PORT}`
+const FRONTEND_URL  = `http://localhost:${FRONTEND_PORT}`
+
 let mainWindow
 let backendProc
 let frontendProc
@@ -33,7 +40,7 @@ function waitForServer(url, timeoutMs = 45000) {
 async function startBackend() {
   // Si ya hay un backend en :8000, no lo volvemos a lanzar
   const alreadyUp = await new Promise(resolve => {
-    http.get('http://localhost:8000/api/status', res => {
+    http.get(`${BACKEND_URL}/api/status`, res => {
       resolve(res.statusCode < 500)
     }).on('error', () => resolve(false))
   })
@@ -63,7 +70,7 @@ function waitForBackend(timeoutMs = 20000) {
   const start = Date.now()
   return new Promise(resolve => {
     const tryOnce = () => {
-      http.get('http://localhost:8000/api/status', res => {
+      http.get(`${BACKEND_URL}/api/status`, res => {
         if (res.statusCode < 500) resolve(true)
         else retry()
       }).on('error', retry)
@@ -99,7 +106,7 @@ async function restartBackend() {
 async function startFrontend() {
   // Si ya hay un frontend en :5173, no lo volvemos a lanzar
   const alreadyUp = await new Promise(resolve => {
-    http.get('http://localhost:5173', res => {
+    http.get(FRONTEND_URL, res => {
       resolve(res.statusCode < 500)
     }).on('error', () => resolve(false))
   })
@@ -217,15 +224,15 @@ async function createWindow() {
   // Espera a que estén listos
   try {
     await Promise.all([
-      waitForServer('http://localhost:8000/api/status'),
-      waitForServer('http://localhost:5173'),
+      waitForServer(`${BACKEND_URL}/api/status`),
+      waitForServer(FRONTEND_URL),
     ])
     console.log('[electron] Servidores listos, cargando app...')
-    if (mainWindow) mainWindow.loadURL('http://localhost:5173')
+    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
   } catch (err) {
     console.error('[electron] Error esperando servidores:', err.message)
     // Intenta cargar de todos modos
-    if (mainWindow) mainWindow.loadURL('http://localhost:5173')
+    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
   }
 }
 
