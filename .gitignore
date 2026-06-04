@@ -8,6 +8,11 @@ venv/
 *.egg-info/
 .build_subtr_actor/
 
+# Tests / cobertura
+.coverage
+.pytest_cache/
+htmlcov/
+
 # Base de datos y caché (datos personales, no subir)
 data/
 *.db

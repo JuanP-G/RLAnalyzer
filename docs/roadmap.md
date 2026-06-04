@@ -40,11 +40,12 @@
 - **Solución:** Parsear el atributo `Boost` (o `ReplicatedBoostAmount`) de los actores de boost de cada jugador en el actor state machine. Añadir `boost` como campo en el array de `cars`.
 - **Archivos:** `replay_frames.py`
 
-#### Tests automatizados básicos
-- Pytest con fixtures para un replay de muestra
-- Tests unitarios para `_parse_rrrocket()` con JSON conocido
-- Tests de integración para los endpoints principales
-- **Archivos nuevos:** `backend/tests/`
+#### Tests automatizados básicos — ✅ Hecho (47 tests)
+- ✅ Pytest con fixtures (SQLite en memoria + `dependency_overrides`), sin red ni binarios nativos
+- ✅ Tests unitarios de helpers (`stats`, `players`, `profile._parse`) con JSON conocido
+- ✅ Tests de integración de los endpoints principales (`/api/replays`, `/api/stats/*`, `/api/players/*`)
+- Pendiente futuro: tests del parser real (`replay_frames`/`parser`) mockeando subtr_actor/rrrocket
+- **Archivos:** `backend/tests/`, `backend/conftest.py`, `backend/requirements-dev.txt`
 
 ### P2 — Media prioridad
 
@@ -87,7 +88,7 @@
 
 | ID | Descripción | Impacto |
 |----|-------------|---------|
-| DT-01 | Sin tests automatizados | Alto — cualquier cambio puede romper silenciosamente |
+| DT-01 | ~~Sin tests automatizados~~ → suite pytest del backend (47 tests) | ✅ Resuelto (falta cubrir el parser nativo) |
 | DT-02 | `raw_meta` en BD guarda JSON completo de subtr-actor (puede crecer) | Bajo |
 | DT-03 | Caché de frames no se invalida si el `.replay` cambia o se mueve | Medio |
 | DT-04 | `PLAYER_NAME` hardcodeado en `config.py` — no configurable desde UI | Medio |
