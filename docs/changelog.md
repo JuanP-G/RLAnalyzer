@@ -35,6 +35,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 - Al cambiar de jugador se recalcula `Replay.my_team`/`Replay.result` desde su perspectiva, así la
   victoria/derrota es correcta aunque el nuevo jugador estuviera en el equipo rival.
 - Validación: `PUT /api/settings` rechaza (400) jugador o carpeta vacíos.
+- **Perfil tracker.gg respeta el jugador activo**: `profile.py` leía `config.PLAYER_NAME` directo, así
+  que la página de Perfil (rangos/MMR) no cambiaba al cambiar de jugador en Ajustes. Ahora usa
+  `settings_store.get_player_name()`, completando el multi-perfil.
 
 ---
 
