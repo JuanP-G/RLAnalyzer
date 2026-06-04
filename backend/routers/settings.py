@@ -14,8 +14,10 @@ from pydantic import BaseModel
 from sqlalchemy import func
 
 import settings_store
-from database import SessionLocal
 from models import PlayerStat, Replay
+# OJO: SessionLocal se importa de forma DIFERIDA dentro de las funciones (no a nivel de
+# módulo) para que el monkeypatch de los tests (que sustituye database.SessionLocal por
+# la BD de test) se aplique de forma fiable, igual que en profile.py / settings_store.py.
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["settings"])
@@ -28,6 +30,7 @@ class SettingsUpdate(BaseModel):
 
 def _known_players() -> list[str]:
     """Jugadores vistos en la BD (para autocompletar el nombre)."""
+    from database import SessionLocal
     db = SessionLocal()
     try:
         rows = (
@@ -65,6 +68,7 @@ def _retag_is_me(new_name: str):
     result/my_team antiguos; quedan fuera de las stats personales (no tienen is_me), pero
     aún se cuentan en /stats/summary y en la lista de partidas.
     """
+    from database import SessionLocal
     db = SessionLocal()
     try:
         db.query(PlayerStat).update({PlayerStat.is_me: False}, synchronize_session=False)
