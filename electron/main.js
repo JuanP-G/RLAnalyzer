@@ -41,6 +41,11 @@ async function startBackend() {
     console.log('[backend] ya estaba corriendo, reutilizando')
     return
   }
+  spawnBackend()
+}
+
+// Lanza el proceso del backend (sin comprobar si ya está arriba)
+function spawnBackend() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
   backendProc = spawn(pythonCmd, ['main.py'], {
     cwd:      path.join(ROOT, 'backend'),
@@ -51,6 +56,43 @@ async function startBackend() {
   backendProc.stdout.on('data', d => console.log('[backend]', d.toString().trim()))
   backendProc.stderr.on('data', d => console.error('[backend]', d.toString().trim()))
   backendProc.on('exit', code => console.log('[backend] exited:', code))
+}
+
+// Espera (hasta timeout) a que el backend responda en /api/status
+function waitForBackend(timeoutMs = 20000) {
+  const start = Date.now()
+  return new Promise(resolve => {
+    const tryOnce = () => {
+      http.get('http://localhost:8000/api/status', res => {
+        if (res.statusCode < 500) resolve(true)
+        else retry()
+      }).on('error', retry)
+    }
+    const retry = () => {
+      if (Date.now() - start > timeoutMs) return resolve(false)
+      setTimeout(tryOnce, 500)
+    }
+    tryOnce()
+  })
+}
+
+// Reinicia el backend en segundo plano sin cerrar la ventana de la app.
+// Devuelve { ok } o { ok:false, reason:'external' } si el backend no lo gestiona Electron.
+async function restartBackend() {
+  if (!backendProc) return { ok: false, reason: 'external' }
+  const old = backendProc
+  backendProc = null
+  await new Promise(resolve => {
+    let done = false
+    const finish = () => { if (!done) { done = true; resolve() } }
+    old.once('exit', finish)
+    try { old.kill() } catch (_) {}
+    setTimeout(finish, 4000)   // fallback por si no emite 'exit'
+  })
+  await new Promise(r => setTimeout(r, 1000))   // dar tiempo a liberar el puerto :8000
+  spawnBackend()
+  const up = await waitForBackend(20000)
+  return { ok: up }
 }
 
 // ── Lanza el servidor de desarrollo Vite ─────────────────────────────────────
@@ -228,6 +270,8 @@ ipcMain.handle('dialog:selectFolder', async () => {
   if (canceled || !filePaths?.length) return { ok: false, canceled: true }
   return { ok: true, path: filePaths[0] }
 })
+
+ipcMain.handle('backend:restart', () => restartBackend())
 
 // ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
 // Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de

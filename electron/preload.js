@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Diálogos nativos
   selectFolder:       ()         => ipcRenderer.invoke('dialog:selectFolder'),
 
+  // Reinicia el backend en segundo plano (sin cerrar la ventana)
+  restartBackend:     ()         => ipcRenderer.invoke('backend:restart'),
+
   // Visor embebido de Ballchasing (WebContentsView)
   bcViewOpen:      (url, bounds) => ipcRenderer.invoke('bcview:open', url, bounds),
   bcViewSetBounds: (bounds)      => ipcRenderer.invoke('bcview:setBounds', bounds),

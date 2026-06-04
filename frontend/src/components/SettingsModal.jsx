@@ -23,6 +23,7 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [folder, setFolder] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
+  const [restarting, setRestarting] = useState(false)
   const [msg, setMsg]         = useState(null)   // { type:'ok'|'err', text }
 
   useEffect(() => {
@@ -57,12 +58,38 @@ export default function SettingsModal({ onClose, onSaved }) {
       const res = await api.updateSettings(payload)
       if (payload.player_name) await invalidateProfileCache()
       setData(res); setName(res.player_name || ''); setFolder(res.replays_folder || '')
-      setMsg({ type: 'ok', text: 'Ajustes guardados.' })
       onSaved?.()
+      if (payload.player_name) {
+        // Cambiar de jugador re-etiqueta todas las stats → recargar la vista para que
+        // todas las pantallas reflejen el cambio al instante (sin reiniciar nada).
+        setMsg({ type: 'ok', text: 'Aplicando cambios…' })
+        setTimeout(() => window.location.reload(), 600)
+      } else {
+        setMsg({ type: 'ok', text: 'Ajustes guardados.' })
+      }
     } catch (e) {
       setMsg({ type: 'err', text: e.message })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const restartBackend = async () => {
+    if (!isElectron) return
+    setRestarting(true); setMsg({ type: 'ok', text: 'Reiniciando backend…' })
+    try {
+      const res = await window.electronAPI.restartBackend()
+      if (res?.ok) {
+        window.location.reload()
+      } else if (res?.reason === 'external') {
+        setMsg({ type: 'err', text: 'El backend se lanzó por separado; reinícialo tú manualmente.' })
+      } else {
+        setMsg({ type: 'err', text: 'No se pudo reiniciar el backend.' })
+      }
+    } catch (e) {
+      setMsg({ type: 'err', text: e.message })
+    } finally {
+      setRestarting(false)
     }
   }
 
@@ -144,12 +171,24 @@ export default function SettingsModal({ onClose, onSaved }) {
                 </div>
               </Section>
 
-              <Section title="Avanzado" desc="Requiere reiniciar el backend para cambiarse.">
+              <Section title="Avanzado" desc="Estos valores solo cambian editando la configuración y reiniciando el backend.">
                 <div className="text-xs text-gray-500 space-y-1 font-mono-num">
                   <p>Puerto backend: <span className="text-gray-300">{data?.backend_port}</span></p>
                   <p>Base de datos: <span className="text-gray-300 break-all">{data?.db_path}</span></p>
                   <p>Zona horaria: <span className="text-gray-300">{data?.timezone}</span></p>
                 </div>
+                {isElectron && (
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid #122A4D' }}>
+                    <button onClick={restartBackend} disabled={restarting}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition-all disabled:opacity-50"
+                      style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>
+                      {restarting ? 'Reiniciando…' : '↻ Reiniciar backend'}
+                    </button>
+                    <p className="text-[11px] text-gray-500 mt-1.5">
+                      Reinicia el backend en segundo plano sin cerrar la app. Útil si algo se queda colgado.
+                    </p>
+                  </div>
+                )}
               </Section>
             </>
           )}

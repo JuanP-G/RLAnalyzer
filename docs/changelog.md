@@ -18,7 +18,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
     y refresca el perfil; input con autocompletado de jugadores vistos
   - **Carpeta de replays** seleccionable con diálogo nativo de Electron (`selectFolder` vía IPC);
     al cambiarla se reinicia el watcher y se re-escanea
-  - Info read-only de puerto/BD/zona horaria
+  - Info read-only de puerto/BD/zona horaria + botón **Reiniciar backend** (Electron)
+- **Cambios aplicados sin reiniciar a mano**:
+  - Al cambiar de jugador, la vista se **recarga automáticamente** para reflejar el re-etiquetado en todas las pantallas
+  - **Reinicio del backend desde Electron** (IPC `backend:restart`): respawnea el proceso Python y reconecta sin cerrar la ventana
 - **Configuración en BD** (tabla `settings` + `settings_store.py` + `routers/settings.py`):
   `PLAYER_NAME` y `REPLAYS_FOLDER` salen de `config.py` (que pasa a ser solo defaults), leídos por
   función con caché. `/api/status` devuelve los valores efectivos.
