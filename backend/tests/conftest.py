@@ -45,6 +45,21 @@ def db(TestSessionLocal):
 
 
 @pytest.fixture(autouse=True)
+def _patch_sessionlocal(TestSessionLocal, monkeypatch):
+    """
+    Redirige el SessionLocal global a la BD de test. Necesario porque settings_store,
+    el re-tag de is_me y known_players usan `SessionLocal()` directo (no el override de
+    get_db). Funciona porque esos call-sites importan SessionLocal de forma diferida.
+    """
+    import database
+    monkeypatch.setattr(database, "SessionLocal", TestSessionLocal)
+    import settings_store
+    settings_store.invalidate()
+    yield
+    settings_store.invalidate()
+
+
+@pytest.fixture(autouse=True)
 def _clean_tables(db):
     """
     Limpia las tablas tras cada test usando la MISMA sesión del test, de modo que
@@ -55,6 +70,7 @@ def _clean_tables(db):
     db.rollback()  # descarta lo no commiteado del test
     db.query(models.PlayerStat).delete()
     db.query(models.Replay).delete()
+    db.query(models.Setting).delete()
     db.commit()
 
 
@@ -67,9 +83,10 @@ def client(db):
     from routers.stats import router as stats_router
     from routers.players import router as players_router
     from routers.viewer import router as viewer_router
+    from routers.settings import router as settings_router
 
     app = FastAPI()
-    for r in (replays_router, stats_router, players_router, viewer_router):
+    for r in (replays_router, stats_router, players_router, viewer_router, settings_router):
         app.include_router(r)
 
     def _override_get_db():

@@ -63,6 +63,14 @@ function IconCompare() {
     </svg>
   )
 }
+function IconSettings() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
+      <circle cx="8" cy="8" r="2.4"/>
+      <path d="M8 1.2v2 M8 12.8v2 M1.2 8h2 M12.8 8h2 M3.2 3.2l1.4 1.4 M11.4 11.4l1.4 1.4 M12.8 3.2l-1.4 1.4 M4.6 11.4l-1.4 1.4" opacity="0.85"/>
+    </svg>
+  )
+}
 const links = [
   { to: '/profile',  label: 'Mi Perfil',  Icon: IconProfile },
   { to: '/',         label: 'Dashboard',  Icon: IconDashboard },
@@ -70,6 +78,7 @@ const links = [
   { to: '/compare',  label: 'Comparar',   Icon: IconCompare },
   { to: '/analysis', label: 'Análisis',   Icon: IconAnalysis },
   { to: '/viewer',   label: 'Visor 3D',   Icon: IconViewer3D },
+  { to: '/settings', label: 'Ajustes',    Icon: IconSettings },
 ]
 
 export default function Sidebar({ playerName, folderOk }) {

@@ -72,6 +72,7 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 | `/viewer/:id` | `ReplayViewer.jsx` | Visor 3D Three.js + visor embebido de Ballchasing |
 | `/profile` | `Profile.jsx` | Rangos, MMR, historial tracker.gg |
 | `/players/:name` | `PlayerHistory.jsx` | Récord con/contra un jugador |
+| `/settings` | `Settings.jsx` | Jugador principal (multi-perfil) y carpeta de replays |
 
 **Cliente HTTP (`api.js`):** caché en memoria por URL con TTL 60s. Todas las peticiones van a `http://localhost:8000`.
 
@@ -113,6 +114,14 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 | `routers/players.py` | Historial con/contra otros jugadores: `/api/players/*` |
 | `routers/viewer.py` | Subida y URL de visor de Ballchasing: `/api/replays/{id}/ballchasing` |
 | `routers/profile.py` | Endpoints `/api/profile/*`, caché tracker.gg |
+| `routers/settings.py` | `GET/PUT /api/settings` — jugador y carpeta configurables |
+| `settings_store.py` | Accesor de ajustes (tabla `settings`) con caché y fallback a `config.py` |
+
+**Configuración en runtime (`settings_store.py` + tabla `settings`):** `PLAYER_NAME` y
+`REPLAYS_FOLDER` se leen por función desde la tabla `settings` (con fallback a `config.py`), de modo
+que se pueden cambiar desde la pantalla de Ajustes sin editar código ni reiniciar. Cambiar el jugador
+principal re-etiqueta `is_me` en `player_stats` (multi-perfil); cambiar la carpeta reinicia el watcher
+y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen siendo solo de arranque (config/`.env`).
 
 ### 4. Base de datos
 

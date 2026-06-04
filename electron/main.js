@@ -220,6 +220,15 @@ ipcMain.handle('replay:export', async (_event, filePath) => {
   }
 })
 
+ipcMain.handle('dialog:selectFolder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title:      'Selecciona la carpeta de replays',
+    properties: ['openDirectory'],
+  })
+  if (canceled || !filePaths?.length) return { ok: false, canceled: true }
+  return { ok: true, path: filePaths[0] }
+})
+
 // ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
 // Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de
 // render de Chromium que la ventana principal (WebGL/GPU real), de modo que el

@@ -85,6 +85,12 @@ export const api = {
                   }).then(r => { if (!r.ok) throw new Error('Error al actualizar favorito'); return r.json() }),
   profile:        ()                     => cached('profile',        () => fetchJSON(`${BASE}/profile`)),
   profileHistory: ()                     => cached('profileHistory', () => fetchJSON(`${BASE}/profile/history`)),
+  getSettings:    ()                     => fetchJSON(`${BASE}/settings`),
+  updateSettings: (payload)              => fetch(`${BASE}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  }).then(r => { if (!r.ok) throw new Error('Error al guardar ajustes'); return r.json() }),
   players:        (q = '')               => fetchJSON(`${BASE}/players${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   playerSummary:  (name)                 => fetchJSON(`${BASE}/players/${encodeURIComponent(name)}/summary`),
   playerReplays:  (name, ctx, skip = 0, limit = 30) => {

@@ -12,7 +12,7 @@ from typing import Optional
 
 import subtr_actor
 
-from config import PLAYER_NAME
+from settings_store import get_player_name
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +105,12 @@ def parse_replay(file_path: str) -> Optional[dict]:
                     continue
 
         # ── 5. Identificar mi equipo ─────────────────────────────────────────
+        me_name = get_player_name().lower()
         my_team = None
         for team_num, team_players in [(0, team_zero_players), (1, team_one_players)]:
             for p in team_players:
                 name = _safe_get(p, "name") or _safe_get(p, "stats", "Name") or ""
-                if str(name).lower() == PLAYER_NAME.lower():
+                if str(name).lower() == me_name:
                     my_team = team_num
                     break
             if my_team is not None:
@@ -165,7 +166,7 @@ def parse_replay(file_path: str) -> Optional[dict]:
                 b = boost_by_pid.get(pid_value) or {}
                 m = movement_by_pid.get(pid_value) or {}
 
-                is_me = str(name).lower() == PLAYER_NAME.lower()
+                is_me = str(name).lower() == me_name
 
                 players.append({
                     "player_name":      str(name),

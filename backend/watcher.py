@@ -13,7 +13,7 @@ from threading import Thread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from config import REPLAYS_FOLDER
+from settings_store import get_replays_folder
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +61,11 @@ class ReplayWatcher:
         self._started = False
 
     def start(self):
-        folder = REPLAYS_FOLDER
-        if not os.path.exists(folder):
+        folder = get_replays_folder()
+        if not folder or not os.path.exists(folder):
             logger.warning(
                 f"Carpeta de replays no encontrada: {folder}\n"
-                "Revisa REPLAYS_FOLDER en backend/config.py"
+                "Configúrala en la pantalla de Ajustes."
             )
             return
 
@@ -79,7 +79,15 @@ class ReplayWatcher:
         if self._started:
             self.observer.stop()
             self.observer.join()
+            self._started = False
             logger.info("Watcher detenido")
+
+    def restart(self):
+        """Reinicia el watcher con la carpeta actual. Un Observer no se puede
+        re-arrancar tras stop(), así que se crea uno nuevo."""
+        self.stop()
+        self.observer = Observer()
+        self.start()
 
 
 def scan_existing_replays(processed_paths: set[str]) -> list[str]:
@@ -87,7 +95,7 @@ def scan_existing_replays(processed_paths: set[str]) -> list[str]:
     Escanea la carpeta de replays buscando archivos .replay
     que aún no hayan sido procesados. Útil al arrancar la app.
     """
-    folder = Path(REPLAYS_FOLDER)
+    folder = Path(get_replays_folder())
     if not folder.exists():
         return []
 

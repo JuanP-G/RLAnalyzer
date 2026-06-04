@@ -11,10 +11,13 @@ import Profile from './pages/Profile'
 import PlayerHistory from './pages/PlayerHistory'
 import Analysis from './pages/Analysis'
 import Compare from './pages/Compare'
+import Settings from './pages/Settings'
 import { api } from './api'
 
 export default function App() {
   const [status, setStatus] = useState(null)
+
+  const refreshStatus = () => api.status().then(setStatus).catch(() => {})
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus(null))
@@ -44,6 +47,7 @@ export default function App() {
             <Route path="/viewer/:id"      element={<ReplayViewer />} />
             <Route path="/profile"        element={<Profile />} />
             <Route path="/players/:name"  element={<PlayerHistory />} />
+            <Route path="/settings"       element={<Settings onSaved={refreshStatus} />} />
           </Routes>
         </main>
       </div>
