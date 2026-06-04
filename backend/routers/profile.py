@@ -16,7 +16,8 @@ from urllib.error import HTTPError
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
-from config import PLAYER_NAME, BASE_DIR
+from config import BASE_DIR
+import settings_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["profile"])
@@ -423,7 +424,7 @@ def get_profile():
         return _mem_profile["data"]
 
     # Intentar refrescar desde tracker.gg
-    fresh, err = _fetch_fresh(PLAYER_NAME)
+    fresh, err = _fetch_fresh(settings_store.get_player_name())
 
     if fresh:
         fresh["_stale"] = False
@@ -458,7 +459,7 @@ def get_profile_history():
     try:
         url = (
             f"https://api.tracker.gg/api/v2/rocket-league/player-history/mmr"
-            f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}"
+            f"/{TRACKER_PLATFORM}/{quote(settings_store.get_player_name())}"
         )
         data = _get_json(url).get("data", {})
         _mem_history = {"data": data, "ts": now}
@@ -480,7 +481,7 @@ def debug_profile_stats():
     try:
         url = (
             f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
-            f"/{TRACKER_PLATFORM}/{_quote(PLAYER_NAME)}"
+            f"/{TRACKER_PLATFORM}/{_quote(settings_store.get_player_name())}"
         )
         raw = _get_json(url)
     except Exception as e:
@@ -533,7 +534,7 @@ def diagnose_profile():
     result = {
         "api_key_loaded":     bool(TRACKER_API_KEY),
         "api_key_prefix":     TRACKER_API_KEY[:6] + "..." if TRACKER_API_KEY else "(ninguna)",
-        "player_name":        PLAYER_NAME,
+        "player_name":        settings_store.get_player_name(),
         "platform":           TRACKER_PLATFORM,
         "api_blocked_until":  _api_blocked_until,
         "api_blocked_active": time.time() < _api_blocked_until,
@@ -553,7 +554,7 @@ def diagnose_profile():
     # Test API sin key — a veces funciona con headers de navegador puro
     api_url_nokey = (
         f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
-        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}"
+        f"/{TRACKER_PLATFORM}/{quote(settings_store.get_player_name())}"
     )
     try:
         req = Request(api_url_nokey, headers={
@@ -577,7 +578,7 @@ def diagnose_profile():
     # Test API directo — muestra el error HTTP exacto
     api_url = (
         f"https://api.tracker.gg/api/v2/rocket-league/standard/profile"
-        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}"
+        f"/{TRACKER_PLATFORM}/{quote(settings_store.get_player_name())}"
     )
     result["api_url"] = api_url
     try:
@@ -597,7 +598,7 @@ def diagnose_profile():
     # Test scraping — inspección profunda de la estructura del HTML
     scrape_url = (
         f"https://rocketleague.tracker.network/rocket-league/profile"
-        f"/{TRACKER_PLATFORM}/{quote(PLAYER_NAME)}/overview"
+        f"/{TRACKER_PLATFORM}/{quote(settings_store.get_player_name())}/overview"
     )
     result["scrape_url"] = scrape_url
     try:
@@ -629,7 +630,7 @@ def diagnose_profile():
                 scripts_with_segments.append({"script_index": i, "length": len(s), "snippet": s[:150]})
         result["scripts_with_segments"] = scripts_with_segments[:5]
 
-        data = _scrape(PLAYER_NAME)
+        data = _scrape(settings_store.get_player_name())
         result["scrape_status"] = "OK — datos encontrados" if data else "FAIL — sin datos en HTML"
     except Exception as e:
         result["scrape_status"] = f"Error: {type(e).__name__}: {e}"
