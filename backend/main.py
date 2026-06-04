@@ -35,6 +35,7 @@ from routers.profile import router as profile_router
 from routers.players import router as players_router
 from routers.viewer  import router as viewer_router
 from routers.stats   import router as stats_router
+from routers.settings import router as settings_router
 from config import BACKEND_PORT
 
 logging.basicConfig(
@@ -113,6 +114,22 @@ def save_replay_to_db(data: dict):
         logger.exception(f"Error guardando replay: {e}")
     finally:
         db.close()
+
+
+def restart_watcher_and_rescan():
+    """Reinicia el watcher con la carpeta actual y encola los .replay nuevos.
+    Lo invoca el endpoint PUT /api/settings al cambiar la carpeta de replays."""
+    from watcher import scan_existing_replays, _processed_files, _pending_files
+    watcher.restart()
+    db = SessionLocal()
+    try:
+        in_db = {r.file_path for r in db.query(Replay.file_path).all()}
+    finally:
+        db.close()
+    new_files = scan_existing_replays(in_db | set(_processed_files))
+    if new_files:
+        _pending_files.extend(new_files)
+        logger.info(f"Carpeta cambiada: {len(new_files)} replays encolados")
 
 
 async def process_pending_loop():
@@ -194,6 +211,7 @@ app.include_router(profile_router)
 app.include_router(players_router)
 app.include_router(viewer_router)
 app.include_router(stats_router)
+app.include_router(settings_router)
 
 
 @app.get("/")

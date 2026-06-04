@@ -73,6 +73,10 @@ React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffec
 | `/profile` | `Profile.jsx` | Rangos, MMR, historial tracker.gg |
 | `/players/:name` | `PlayerHistory.jsx` | Récord con/contra un jugador |
 
+**Ajustes** no es una ruta: es un **modal** (`components/SettingsModal.jsx`) que se abre con el botón de
+engranaje del Sidebar. Contiene secciones (Perfil/Replays/Avanzado) pensadas para crecer (apariencia,
+privacidad, actualizaciones…). Jugador principal (multi-perfil) y carpeta de replays se editan ahí.
+
 **Cliente HTTP (`api.js`):** caché en memoria por URL con TTL 60s. Todas las peticiones van a `http://localhost:8000`.
 
 **Estilos:** Tailwind CSS utility-first. Colores base: azul oscuro (`#0A1929`), naranja (`#FF7A00`), acento azul (`#3A8EFF`).
@@ -113,6 +117,17 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 | `routers/players.py` | Historial con/contra otros jugadores: `/api/players/*` |
 | `routers/viewer.py` | Subida y URL de visor de Ballchasing: `/api/replays/{id}/ballchasing` |
 | `routers/profile.py` | Endpoints `/api/profile/*`, caché tracker.gg |
+| `routers/settings.py` | `GET/PUT /api/settings` — jugador y carpeta configurables |
+| `settings_store.py` | Accesor de ajustes (tabla `settings`) con caché y fallback a `config.py` |
+
+**Configuración en runtime (`settings_store.py` + tabla `settings`):** `PLAYER_NAME` y
+`REPLAYS_FOLDER` se leen por función desde la tabla `settings` (con fallback a `config.py`), de modo
+que se pueden cambiar desde Ajustes sin editar código ni reiniciar. Cambiar el jugador principal
+re-etiqueta `is_me` en `player_stats` **y recalcula `Replay.my_team`/`Replay.result` desde la
+perspectiva del nuevo jugador** en las partidas donde aparece (si estuvo en el equipo rival, su V/D
+se corrige). Limitación: las partidas donde el nuevo jugador no aparece conservan su result antiguo y
+quedan fuera de las stats personales, pero aún se cuentan en `/stats/summary`. Cambiar la carpeta
+reinicia el watcher y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen siendo solo de arranque.
 
 ### 4. Base de datos
 

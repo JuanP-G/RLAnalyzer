@@ -1,6 +1,6 @@
 # Roadmap — RLAnalyzer
 
-> Estado actual: v0.3.1 — Comparador de partidas + retoques del Dashboard (sobre v0.3.0)
+> Estado actual: v0.4.0 — Tests automatizados + Ajustes en la app (multi-perfil y carpeta configurable)
 
 ---
 
@@ -11,10 +11,17 @@
 - **Análisis**: comparativa victorias vs derrotas y frente a compañeros/rivales, con drill-down "¿Por qué?" y evolución temporal.
 - **Comparar**: dos partidas lado a lado (yo + totales de equipo y rival) con delta coloreado y resumen "qué hiciste distinto".
 - **Historial por jugador**: récord con/contra cualquier jugador.
+- **Ajustes** (modal): jugador principal (multi-perfil) y carpeta de replays configurables sin editar código; cambios en caliente.
 
 ---
 
 ## Completado recientemente
+
+### v0.4.0
+- ✅ **Tests automatizados del backend** — 60 tests con pytest (SQLite en memoria, sin red ni binarios), red de seguridad para iterar.
+- ✅ **Configuración desde la app** — modal de Ajustes con jugador principal y carpeta de replays (tabla `settings` + `settings_store`), selector de carpeta nativo en Electron.
+- ✅ **Multi-perfil** — cambiar el jugador principal re-etiqueta `is_me` y recalcula V/D al instante (sin reiniciar); la vista se recarga sola.
+- ✅ **Reinicio del backend sin cerrar la app** (Electron) y puertos centralizados/overridables por entorno.
 
 ### v0.3.1
 - ✅ **Comparativa entre dos partidas** — seleccionar dos replays y comparar stats lado a lado (yo / mi equipo / equipo rival) con indicadores de mejora/empeoramiento.
@@ -69,9 +76,6 @@
 
 ### P3 — Baja prioridad / Futuro
 
-#### Soporte multi-jugador en el visor
-- Ahora `PLAYER_NAME` es un único jugador. Poder cambiar el jugador "principal" desde la UI sin editar `config.py`.
-
 #### Tendencias de MMR en el Dashboard
 - Integrar la evolución de MMR (de tracker.gg) junto a las tendencias de stats ya existentes
 
@@ -91,7 +95,7 @@
 | DT-01 | ~~Sin tests automatizados~~ → suite pytest del backend (47 tests) | ✅ Resuelto (falta cubrir el parser nativo) |
 | DT-02 | `raw_meta` en BD guarda JSON completo de subtr-actor (puede crecer) | Bajo |
 | DT-03 | Caché de frames no se invalida si el `.replay` cambia o se mueve | Medio |
-| DT-04 | `PLAYER_NAME` hardcodeado en `config.py` — no configurable desde UI | Medio |
+| DT-04 | ~~`PLAYER_NAME` hardcodeado en `config.py`~~ → configurable desde Ajustes (multi-perfil) | ✅ Resuelto |
 | DT-05 | Sin manejo de errores en `watcher.py` para replays corruptos | Bajo |
 | DT-06 | El cliente `api.js` no tiene reintentos ante fallos de red temporales | Bajo |
 

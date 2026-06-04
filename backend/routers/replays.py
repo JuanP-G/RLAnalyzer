@@ -395,11 +395,13 @@ def get_my_stats(db: Session = Depends(get_db)):
 @router.get("/status")
 def get_status():
     """Estado del servidor — usado por el frontend para saber si el backend está vivo."""
-    from config import PLAYER_NAME, REPLAYS_FOLDER
     import os
+    import settings_store
+    player_name = settings_store.get_player_name()
+    replays_folder = settings_store.get_replays_folder()
     return {
         "status":         "ok",
-        "player_name":    PLAYER_NAME,
-        "replays_folder": REPLAYS_FOLDER,
-        "folder_exists":  os.path.exists(REPLAYS_FOLDER),
+        "player_name":    player_name,
+        "replays_folder": replays_folder,
+        "folder_exists":  bool(replays_folder) and os.path.exists(replays_folder),
     }

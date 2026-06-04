@@ -5,6 +5,39 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.4.0] — 2026-06-04
+
+### Añadido
+- **Tests automatizados del backend** (`backend/tests/`, 60 con pytest): SQLite en memoria +
+  `dependency_overrides`, sin red ni binarios nativos. Unitarios (stats/players/profile/settings_store) y de
+  API (replays, stats, players, settings, ballchasing/frames mockeados). `requirements-dev.txt`, `run_tests.ps1`.
+- **Ajustes en modal** (`frontend/src/components/SettingsModal.jsx`), abierto desde el botón de
+  engranaje del Sidebar (no es una página). Estructurado en secciones (Perfil/Replays/Avanzado)
+  preparado para crecer (apariencia, privacidad, actualizaciones…)
+  - **Jugador principal configurable** (multi-perfil): cambiarlo re-etiqueta `is_me` en `player_stats`
+    y refresca el perfil; input con autocompletado de jugadores vistos
+  - **Carpeta de replays** seleccionable con diálogo nativo de Electron (`selectFolder` vía IPC);
+    al cambiarla se reinicia el watcher y se re-escanea
+  - Info read-only de puerto/BD/zona horaria + botón **Reiniciar backend** (Electron)
+- **Cambios aplicados sin reiniciar a mano**:
+  - Al cambiar de jugador, la vista se **recarga automáticamente** para reflejar el re-etiquetado en todas las pantallas
+  - **Reinicio del backend desde Electron** (IPC `backend:restart`): respawnea el proceso Python y reconecta sin cerrar la ventana
+- **Configuración en BD** (tabla `settings` + `settings_store.py` + `routers/settings.py`):
+  `PLAYER_NAME` y `REPLAYS_FOLDER` salen de `config.py` (que pasa a ser solo defaults), leídos por
+  función con caché. `/api/status` devuelve los valores efectivos.
+
+### Cambiado
+- `parser.py` y `watcher.py` leen jugador/carpeta desde `settings_store` en vez de constantes.
+- Puertos centralizados y overridables por entorno (`RL_BACKEND_PORT`/`RL_FRONTEND_PORT`) en
+  `config.py`, `electron/main.js` y `vite.config.js` (sin literales `:8000`/`:5173` repetidos).
+
+### Corregido
+- Al cambiar de jugador se recalcula `Replay.my_team`/`Replay.result` desde su perspectiva, así la
+  victoria/derrota es correcta aunque el nuevo jugador estuviera en el equipo rival.
+- Validación: `PUT /api/settings` rechaza (400) jugador o carpeta vacíos.
+
+---
+
 ## [0.3.1] — 2026-05-29
 
 ### Añadido

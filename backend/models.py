@@ -64,3 +64,12 @@ class PlayerStat(Base):
     total_distance   = Column(Float, nullable=True)
 
     replay = relationship("Replay", back_populates="players")
+
+
+class Setting(Base):
+    """Ajustes configurables en runtime (key/value). Defaults en config.py."""
+    __tablename__ = "settings"
+
+    key        = Column(String, primary_key=True)   # "player_name" | "replays_folder" | ...
+    value      = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

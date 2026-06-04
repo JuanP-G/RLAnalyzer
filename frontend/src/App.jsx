@@ -11,10 +11,14 @@ import Profile from './pages/Profile'
 import PlayerHistory from './pages/PlayerHistory'
 import Analysis from './pages/Analysis'
 import Compare from './pages/Compare'
+import SettingsModal from './components/SettingsModal'
 import { api } from './api'
 
 export default function App() {
   const [status, setStatus] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const refreshStatus = () => api.status().then(setStatus).catch(() => {})
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus(null))
@@ -30,6 +34,7 @@ export default function App() {
         <Sidebar
           playerName={status?.player_name}
           folderOk={status?.folder_exists ?? false}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
         {/* Cada página gestiona su propio padding y scroll */}
@@ -47,6 +52,10 @@ export default function App() {
           </Routes>
         </main>
       </div>
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} onSaved={refreshStatus} />
+      )}
     </div>
   )
 }

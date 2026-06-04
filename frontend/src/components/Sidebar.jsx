@@ -63,6 +63,14 @@ function IconCompare() {
     </svg>
   )
 }
+function IconSettings({ size = 18 }) {
+  // Rueda dentada clásica (estilo Material)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.32-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.31-.07.63-.07.94 0 .31.02.63.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.31.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.06.24.25.41.49.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+    </svg>
+  )
+}
 const links = [
   { to: '/profile',  label: 'Mi Perfil',  Icon: IconProfile },
   { to: '/',         label: 'Dashboard',  Icon: IconDashboard },
@@ -72,7 +80,7 @@ const links = [
   { to: '/viewer',   label: 'Visor 3D',   Icon: IconViewer3D },
 ]
 
-export default function Sidebar({ playerName, folderOk }) {
+export default function Sidebar({ playerName, folderOk, onOpenSettings }) {
   return (
     <aside
       className="w-56 h-full flex-shrink-0 flex flex-col"
@@ -90,7 +98,7 @@ export default function Sidebar({ playerName, folderOk }) {
             className="w-9 h-9 rounded-lg flex-shrink-0"
             style={{ objectFit: 'cover' }}
           />
-          <div>
+          <div className="flex-1 min-w-0">
             <h1
               className="font-display font-bold text-white leading-none"
               style={{ fontSize: '1.05rem', letterSpacing: '0.07em' }}
@@ -101,6 +109,18 @@ export default function Sidebar({ playerName, folderOk }) {
               Match Analytics
             </p>
           </div>
+          {/* Botón de Ajustes — rueda clásica, siempre visible arriba */}
+          <button
+            onClick={onOpenSettings}
+            title="Ajustes"
+            aria-label="Ajustes"
+            className="flex-shrink-0 p-1.5 rounded-lg text-gray-500 transition-all duration-300 hover:text-rl-blue hover:rotate-90"
+            style={{ background: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,168,255,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <IconSettings size={18} />
+          </button>
         </div>
 
         {playerName && (

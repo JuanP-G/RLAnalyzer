@@ -6,6 +6,13 @@ const http                           = require('http')
 
 const ROOT = path.join(__dirname, '..')
 
+// Puertos centralizados (un único sitio; overridables por entorno).
+// Deben coincidir con backend/config.py (BACKEND_PORT) y frontend/vite.config.js.
+const BACKEND_PORT  = Number(process.env.RL_BACKEND_PORT)  || 8000
+const FRONTEND_PORT = Number(process.env.RL_FRONTEND_PORT) || 5173
+const BACKEND_URL   = `http://localhost:${BACKEND_PORT}`
+const FRONTEND_URL  = `http://localhost:${FRONTEND_PORT}`
+
 let mainWindow
 let backendProc
 let frontendProc
@@ -33,7 +40,7 @@ function waitForServer(url, timeoutMs = 45000) {
 async function startBackend() {
   // Si ya hay un backend en :8000, no lo volvemos a lanzar
   const alreadyUp = await new Promise(resolve => {
-    http.get('http://localhost:8000/api/status', res => {
+    http.get(`${BACKEND_URL}/api/status`, res => {
       resolve(res.statusCode < 500)
     }).on('error', () => resolve(false))
   })
@@ -41,6 +48,11 @@ async function startBackend() {
     console.log('[backend] ya estaba corriendo, reutilizando')
     return
   }
+  spawnBackend()
+}
+
+// Lanza el proceso del backend (sin comprobar si ya está arriba)
+function spawnBackend() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
   backendProc = spawn(pythonCmd, ['main.py'], {
     cwd:      path.join(ROOT, 'backend'),
@@ -53,11 +65,48 @@ async function startBackend() {
   backendProc.on('exit', code => console.log('[backend] exited:', code))
 }
 
+// Espera (hasta timeout) a que el backend responda en /api/status
+function waitForBackend(timeoutMs = 20000) {
+  const start = Date.now()
+  return new Promise(resolve => {
+    const tryOnce = () => {
+      http.get(`${BACKEND_URL}/api/status`, res => {
+        if (res.statusCode < 500) resolve(true)
+        else retry()
+      }).on('error', retry)
+    }
+    const retry = () => {
+      if (Date.now() - start > timeoutMs) return resolve(false)
+      setTimeout(tryOnce, 500)
+    }
+    tryOnce()
+  })
+}
+
+// Reinicia el backend en segundo plano sin cerrar la ventana de la app.
+// Devuelve { ok } o { ok:false, reason:'external' } si el backend no lo gestiona Electron.
+async function restartBackend() {
+  if (!backendProc) return { ok: false, reason: 'external' }
+  const old = backendProc
+  backendProc = null
+  await new Promise(resolve => {
+    let done = false
+    const finish = () => { if (!done) { done = true; resolve() } }
+    old.once('exit', finish)
+    try { old.kill() } catch (_) {}
+    setTimeout(finish, 4000)   // fallback por si no emite 'exit'
+  })
+  await new Promise(r => setTimeout(r, 1000))   // dar tiempo a liberar el puerto :8000
+  spawnBackend()
+  const up = await waitForBackend(20000)
+  return { ok: up }
+}
+
 // ── Lanza el servidor de desarrollo Vite ─────────────────────────────────────
 async function startFrontend() {
   // Si ya hay un frontend en :5173, no lo volvemos a lanzar
   const alreadyUp = await new Promise(resolve => {
-    http.get('http://localhost:5173', res => {
+    http.get(FRONTEND_URL, res => {
       resolve(res.statusCode < 500)
     }).on('error', () => resolve(false))
   })
@@ -175,15 +224,15 @@ async function createWindow() {
   // Espera a que estén listos
   try {
     await Promise.all([
-      waitForServer('http://localhost:8000/api/status'),
-      waitForServer('http://localhost:5173'),
+      waitForServer(`${BACKEND_URL}/api/status`),
+      waitForServer(FRONTEND_URL),
     ])
     console.log('[electron] Servidores listos, cargando app...')
-    if (mainWindow) mainWindow.loadURL('http://localhost:5173')
+    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
   } catch (err) {
     console.error('[electron] Error esperando servidores:', err.message)
     // Intenta cargar de todos modos
-    if (mainWindow) mainWindow.loadURL('http://localhost:5173')
+    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
   }
 }
 
@@ -219,6 +268,17 @@ ipcMain.handle('replay:export', async (_event, filePath) => {
     return { ok: false, error: err.message }
   }
 })
+
+ipcMain.handle('dialog:selectFolder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title:      'Selecciona la carpeta de replays',
+    properties: ['openDirectory'],
+  })
+  if (canceled || !filePaths?.length) return { ok: false, canceled: true }
+  return { ok: true, path: filePaths[0] }
+})
+
+ipcMain.handle('backend:restart', () => restartBackend())
 
 // ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
 // Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de

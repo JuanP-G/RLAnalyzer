@@ -18,8 +18,9 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "rl_data.db")
 
-# Puerto del servidor backend (no tocar salvo conflicto)
-BACKEND_PORT = 8000
+# Puerto del servidor backend (no tocar salvo conflicto).
+# Overridable por entorno (debe coincidir con electron/main.js y vite.config.js).
+BACKEND_PORT = int(os.environ.get("RL_BACKEND_PORT", 8000))
 
 # Zona horaria local para mostrar fechas correctamente
 TIMEZONE = "Europe/Madrid"
