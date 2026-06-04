@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 import settings_store
 from database import SessionLocal
-from models import PlayerStat
+from models import PlayerStat, Replay
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["settings"])
@@ -56,13 +56,37 @@ def _effective() -> dict:
 
 
 def _retag_is_me(new_name: str):
-    """Marca is_me=True solo en las filas del jugador activo (comparación case-insensitive)."""
+    """
+    Marca is_me=True solo en las filas del jugador activo (case-insensitive) y recalcula
+    Replay.my_team / Replay.result desde SU perspectiva en las partidas donde aparece
+    (si el nuevo jugador estuvo en el equipo rival, su V/D estaría invertida si no se recalcula).
+
+    Limitación conocida: las partidas donde el nuevo jugador NO aparece conservan su
+    result/my_team antiguos; quedan fuera de las stats personales (no tienen is_me), pero
+    aún se cuentan en /stats/summary y en la lista de partidas.
+    """
     db = SessionLocal()
     try:
         db.query(PlayerStat).update({PlayerStat.is_me: False}, synchronize_session=False)
         db.query(PlayerStat).filter(
             func.lower(PlayerStat.player_name) == new_name.lower()
         ).update({PlayerStat.is_me: True}, synchronize_session=False)
+        db.commit()
+
+        # team del nuevo jugador por replay (donde aparece)
+        team_by_replay = {
+            ps.replay_id: ps.team
+            for ps in db.query(PlayerStat).filter(PlayerStat.is_me == True).all()
+        }
+        for replay in db.query(Replay).all():
+            t = team_by_replay.get(replay.id)
+            if t is None:
+                continue
+            replay.my_team = t
+            if replay.team0_score is not None and replay.team1_score is not None:
+                mine  = replay.team0_score if t == 0 else replay.team1_score
+                other = replay.team1_score if t == 0 else replay.team0_score
+                replay.result = "win" if mine > other else "loss" if mine < other else "draw"
         db.commit()
     finally:
         db.close()

@@ -122,9 +122,12 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 
 **Configuración en runtime (`settings_store.py` + tabla `settings`):** `PLAYER_NAME` y
 `REPLAYS_FOLDER` se leen por función desde la tabla `settings` (con fallback a `config.py`), de modo
-que se pueden cambiar desde la pantalla de Ajustes sin editar código ni reiniciar. Cambiar el jugador
-principal re-etiqueta `is_me` en `player_stats` (multi-perfil); cambiar la carpeta reinicia el watcher
-y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen siendo solo de arranque (config/`.env`).
+que se pueden cambiar desde Ajustes sin editar código ni reiniciar. Cambiar el jugador principal
+re-etiqueta `is_me` en `player_stats` **y recalcula `Replay.my_team`/`Replay.result` desde la
+perspectiva del nuevo jugador** en las partidas donde aparece (si estuvo en el equipo rival, su V/D
+se corrige). Limitación: las partidas donde el nuevo jugador no aparece conservan su result antiguo y
+quedan fuera de las stats personales, pero aún se cuentan en `/stats/summary`. Cambiar la carpeta
+reinicia el watcher y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen siendo solo de arranque.
 
 ### 4. Base de datos
 

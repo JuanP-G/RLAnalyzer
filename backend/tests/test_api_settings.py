@@ -31,6 +31,18 @@ def test_put_player_name_retags_is_me(client, db):
     assert client.get("/api/status").json()["player_name"] == "Mate0"
 
 
+def test_put_player_name_recomputes_result_for_rival(client, db):
+    # ME (equipo 0) gana 3-1; Opp0 está en el equipo 1 → para Opp0 es derrota
+    r = make_replay(db, team_size=2, my_team=0, result="win", team0_score=3, team1_score=1)
+    client.put("/api/settings", json={"player_name": "Opp0"})
+    db.expire_all()
+    detail = client.get(f"/api/replays/{r.id}").json()
+    assert detail["my_team"] == 1
+    assert detail["result"] == "loss"
+    summary = client.get("/api/stats/summary").json()
+    assert summary["wins"] == 0 and summary["losses"] == 1
+
+
 def test_put_replays_folder(client, db, monkeypatch):
     # No tocar el watcher real en tests
     monkeypatch.setattr("routers.settings._apply_folder_change", lambda: None)
