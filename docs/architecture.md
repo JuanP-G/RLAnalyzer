@@ -129,6 +129,16 @@ se corrige). Limitación: las partidas donde el nuevo jugador no aparece conserv
 quedan fuera de las stats personales, pero aún se cuentan en `/stats/summary`. Cambiar la carpeta
 reinicia el watcher y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen siendo solo de arranque.
 
+> **Papel de `config.py` hoy:** es **legacy** — antes era el "panel de control" del desarrollador
+> (de ahí su cabecera original "único archivo que editar"). Ahora el jugador y la carpeta se
+> configuran desde **Ajustes** (BD), que tiene prioridad. `PLAYER_NAME`/`REPLAYS_FOLDER` en
+> `config.py` quedan solo como **valores por defecto / red de seguridad**: se usan en el primer
+> arranque (tabla `settings` vacía) o como respaldo. Editarlos solo sirve si quieres arrancar ya
+> 100% configurado sin abrir Ajustes. La única parte de `config.py` que es imprescindible y
+> permanente son `BASE_DIR`/`DB_PATH` (ubicación de la BD; no puede guardarse dentro de la BD) y
+> `BACKEND_PORT` (el servidor debe conocer el puerto antes de leer nada). La app **nunca escribe**
+> en `config.py`.
+
 ### 4. Base de datos
 
 SQLite en `data/rl_data.db`. Dos tablas:
