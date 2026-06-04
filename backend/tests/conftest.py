@@ -7,6 +7,9 @@ binarios nativos (subtr_actor/rrrocket), sin watcher ni lifespan. NO se importa
 en su lugar se monta una app de test mínima con los routers reales y un override
 de `get_db`.
 """
+import sys
+import types
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -96,3 +99,61 @@ def client(db):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# ── Mock de subtr_actor para testear parser.py ───────────────────────────────
+class FakeSubtr:
+    """Respuestas configurables de subtr_actor. Si un retorno es una Exception,
+    se lanza al llamarlo (para ejercitar los try/except de parser.py)."""
+    def __init__(self):
+        self.parse_replay_ret = {}
+        self.replay_meta_ret = {}
+        self.get_stats_ret = {}
+
+    def parse_replay(self, data_bytes):
+        if isinstance(self.parse_replay_ret, Exception):
+            raise self.parse_replay_ret
+        return self.parse_replay_ret
+
+    def get_replay_meta(self, path_str):
+        if isinstance(self.replay_meta_ret, Exception):
+            raise self.replay_meta_ret
+        return self.replay_meta_ret
+
+    def get_stats(self, path_str, module_names=None):
+        if isinstance(self.get_stats_ret, Exception):
+            raise self.get_stats_ret
+        return self.get_stats_ret
+
+
+@pytest.fixture
+def fake_subtr(monkeypatch):
+    """Inyecta un subtr_actor falso en sys.modules y reimporta parser fresco.
+    Devuelve (parser_module, fake)."""
+    fake = FakeSubtr()
+    mod = types.ModuleType("subtr_actor")
+    mod.parse_replay = fake.parse_replay
+    mod.get_replay_meta = fake.get_replay_meta
+    mod.get_stats = fake.get_stats
+    monkeypatch.setitem(sys.modules, "subtr_actor", mod)
+    monkeypatch.delitem(sys.modules, "parser", raising=False)
+    import parser as parser_mod
+    return parser_mod, fake
+
+
+@pytest.fixture
+def fake_replay_file(tmp_path):
+    """Crea un .replay ficticio (el fake ignora los bytes) para que exista en disco."""
+    p = tmp_path / "match.replay"
+    p.write_bytes(b"FAKE_REPLAY_BYTES")
+    return str(p)
+
+
+@pytest.fixture
+def frames_cache_tmp(tmp_path, monkeypatch):
+    """Repunta FRAMES_CACHE_DIR a un tmp para no escribir caché real."""
+    import replay_frames
+    d = tmp_path / "frames"
+    d.mkdir()
+    monkeypatch.setattr(replay_frames, "FRAMES_CACHE_DIR", str(d))
+    return d
