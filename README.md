@@ -17,8 +17,9 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 - **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento, comparativa vs tu media histórica
 - **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables, más un visor embebido de Ballchasing
 - **Perfil** — rangos por modo (1v1, 2v2, 3v3, extras, casual), historial de MMR y estadísticas de carrera
+- **Ajustes en la app** — configura tu jugador y la carpeta de replays desde un modal (rueda dentada), con selector de carpeta nativo; **multi-perfil** (cambia el jugador principal y todo se recalcula al instante, sin reiniciar)
 - **Offline-first** — sirve los últimos datos conocidos cuando no hay conexión
-- **App de escritorio** — ventana nativa de Windows sin necesidad de abrir el navegador
+- **App de escritorio** — ventana nativa de Windows sin necesidad de abrir el navegador; el backend se puede reiniciar en segundo plano sin cerrar la app
 
 ---
 
@@ -47,7 +48,12 @@ cd RLAnalyzer
 
 ### 2. Configura tus datos
 
-Edita `backend/config.py`:
+Lo más cómodo: arranca la app y pulsa el **botón de Ajustes** (rueda dentada, arriba a la
+izquierda) para fijar tu **jugador principal** y la **carpeta de replays** (con selector de
+carpeta nativo). Los cambios se aplican al instante, sin reiniciar.
+
+`backend/config.py` solo contiene ahora los **valores por defecto** (los que se usan hasta que
+guardas algo en Ajustes):
 
 ```python
 PLAYER_NAME    = "TuNombreEnRocketLeague"   # nombre exacto en el juego
@@ -113,24 +119,27 @@ TRACKER_API_KEY=tu-api-key-aqui
 ```
 RLAnalyzer/
 ├── backend/                 # API REST — Python + FastAPI
-│   ├── config.py            # ← EDITA ESTO con tus datos (nombre, carpeta replays)
+│   ├── config.py            # Valores por defecto (jugador, carpeta) — editables desde Ajustes
+│   ├── settings_store.py    # Ajustes en runtime (tabla settings) con caché y fallback a config.py
 │   ├── .env                 # ← API keys (no se sube a git)
 │   ├── main.py              # Punto de entrada del servidor
 │   ├── parser.py            # Parseo de .replay con subtr-actor
 │   ├── watcher.py           # Vigilancia automática de la carpeta
 │   ├── replay_frames.py     # Extracción frame a frame con rrrocket (para el visor 3D)
-│   ├── models.py            # Modelos SQLAlchemy
+│   ├── models.py            # Modelos SQLAlchemy (Replay, PlayerStat, Setting)
 │   ├── database.py          # Conexión a SQLite
+│   ├── tests/               # Batería pytest (60 tests, BD en memoria)
 │   └── routers/
-│       ├── replays.py       # Endpoints de partidas + frames
+│       ├── replays.py       # Endpoints de partidas + frames + /status
 │       ├── stats.py         # Análisis y Dashboard (analysis, trend, dashboard, glossary)
 │       ├── players.py       # Historial con/contra otros jugadores
 │       ├── viewer.py        # Subida/visor de Ballchasing
+│       ├── settings.py      # GET/PUT /api/settings (jugador, carpeta)
 │       └── profile.py       # Endpoints de perfil + caché tracker.gg
 ├── frontend/                # UI — React + Vite + Tailwind
 │   ├── src/
 │   │   ├── pages/           # Dashboard, Analysis, Compare, ReplayList, ReplayDetail, ReplayViewer, Profile, PlayerHistory
-│   │   ├── components/      # Sidebar, StatCard, AbnormalHelp, TitleBar
+│   │   ├── components/      # Sidebar, StatCard, AbnormalHelp, SettingsModal, TitleBar
 │   │   ├── utils/           # mapNames, compareStats (lógica del comparador)
 │   │   └── api.js           # Cliente HTTP con caché en memoria
 │   └── public/

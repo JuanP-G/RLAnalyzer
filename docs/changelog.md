@@ -8,9 +8,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 ## [0.4.0] — 2026-06-04
 
 ### Añadido
-- **Tests automatizados del backend** (`backend/tests/`, 58 con pytest): SQLite en memoria +
-  `dependency_overrides`, sin red ni binarios nativos. Unitarios (stats/players/profile) y de API
-  (replays, stats, players, settings, ballchasing/frames mockeados). `requirements-dev.txt`, `run_tests.ps1`.
+- **Tests automatizados del backend** (`backend/tests/`, 60 con pytest): SQLite en memoria +
+  `dependency_overrides`, sin red ni binarios nativos. Unitarios (stats/players/profile/settings_store) y de
+  API (replays, stats, players, settings, ballchasing/frames mockeados). `requirements-dev.txt`, `run_tests.ps1`.
 - **Ajustes en modal** (`frontend/src/components/SettingsModal.jsx`), abierto desde el botón de
   engranaje del Sidebar (no es una página). Estructurado en secciones (Perfil/Replays/Avanzado)
   preparado para crecer (apariencia, privacidad, actualizaciones…)
@@ -28,6 +28,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ### Cambiado
 - `parser.py` y `watcher.py` leen jugador/carpeta desde `settings_store` en vez de constantes.
+- Puertos centralizados y overridables por entorno (`RL_BACKEND_PORT`/`RL_FRONTEND_PORT`) en
+  `config.py`, `electron/main.js` y `vite.config.js` (sin literales `:8000`/`:5173` repetidos).
+
+### Corregido
+- Al cambiar de jugador se recalcula `Replay.my_team`/`Replay.result` desde su perspectiva, así la
+  victoria/derrota es correcta aunque el nuevo jugador estuviera en el equipo rival.
+- Validación: `PUT /api/settings` rechaza (400) jugador o carpeta vacíos.
 
 ---
 

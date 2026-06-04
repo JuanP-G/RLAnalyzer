@@ -396,6 +396,47 @@ Devuelve la URL del visor de Ballchasing para el replay. Si no está en caché, 
 
 ---
 
+## Ajustes
+
+Configuración editable en runtime (tabla `settings`, con fallback a `config.py`).
+
+### `GET /api/settings`
+
+Devuelve los valores efectivos, los read-only (solo arranque) y los jugadores conocidos (para autocompletar).
+
+**Respuesta:**
+```json
+{
+  "player_name": "GustoffotsuG",
+  "replays_folder": "C:\\...\\DemosEpic",
+  "folder_exists": true,
+  "backend_port": 8000,
+  "db_path": "C:\\...\\data\\rl_data.db",
+  "timezone": "Europe/Madrid",
+  "known_players": ["GustoffotsuG", "ldz150", "..."]
+}
+```
+
+### `PUT /api/settings`
+
+Actualiza el jugador principal y/o la carpeta de replays. Ambos campos son opcionales.
+
+**Body:**
+```json
+{ "player_name": "OtroJugador", "replays_folder": "D:\\Replays" }
+```
+
+- Cambiar `player_name` → re-etiqueta `is_me` en `player_stats` y **recalcula `my_team`/`result`** desde la perspectiva del nuevo jugador; invalida la caché de perfil.
+- Cambiar `replays_folder` → reinicia el watcher y re-escanea la nueva carpeta.
+- **400** si `player_name` o `replays_folder` quedan vacíos.
+
+**Respuesta:** igual que `GET /api/settings` más `"changed": { ... }` con lo modificado.
+
+> Puerto/BD/zona horaria son solo de arranque (config/`.env`). El backend se puede reiniciar en
+> segundo plano desde la app de escritorio (IPC de Electron) sin cerrar la ventana.
+
+---
+
 ## Perfil
 
 ### `GET /api/profile`
@@ -470,7 +511,7 @@ Devuelve las claves raw de stats disponibles en cada segmento de playlist. Útil
 
 ### `GET /api/status`
 
-Estado del servidor. Usado por el frontend para saber si el backend está vivo.
+Estado del servidor (usado por el frontend para saber si el backend está vivo). Devuelve los valores **efectivos** de `settings_store` (jugador y carpeta configurados en Ajustes, o los defaults de `config.py`).
 
 **Respuesta:**
 ```json
