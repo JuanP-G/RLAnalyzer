@@ -63,6 +63,13 @@ class PlayerStat(Base):
     time_high_air    = Column(Float, nullable=True)
     total_distance   = Column(Float, nullable=True)
 
+    # Stats avanzadas de posición/posesión (calculadas de los frames, perezoso)
+    possession_pct          = Column(Float, nullable=True)
+    avg_dist_to_goal        = Column(Float, nullable=True)   # metros, a portería propia
+    avg_dist_to_teammate    = Column(Float, nullable=True)   # metros (None en 1v1)
+    time_offensive_half_pct = Column(Float, nullable=True)
+    advanced_computed       = Column(Boolean, default=False)
+
     replay = relationship("Replay", back_populates="players")
 
 

@@ -5,6 +5,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.5.0] — 2026-06-11
+
+### Añadido
+- **Estadísticas avanzadas de partida — posición y posesión** (Fase A del item del roadmap)
+  - **Posesión** por jugador/equipo (% de tiempo siendo el más cercano al balón)
+  - **Distancia media a portería propia**, **distancia al compañero** (sincronía/huecos) y **% en campo rival**
+  - Cálculo **perezoso**: se calcula la 1ª vez que abres una partida (extrae frames con rrrocket) y se
+    **persiste** en BD (columnas nuevas en `player_stats`); después es instantáneo
+  - Núcleo puro `backend/advanced_stats.py` + `field_constants.py`; endpoint `GET /api/replays/{id}/advanced`
+  - Panel **"Posición y posesión"** en el detalle de partida (se calcula al expandirlo)
+  - Grupo nuevo **"Posicionamiento"** en Análisis (medias sobre partidas ya calculadas)
+  - +10 tests (cálculo puro + endpoint perezoso). 103 tests en total.
+
+> Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
+
+---
+
 ## [0.4.0] — 2026-06-04
 
 ### Añadido

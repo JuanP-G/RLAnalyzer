@@ -76,6 +76,7 @@ export const api = {
     return fetchJSON(`${BASE}/replays?${p}`)
   },
   replay:         (id)                   => fetchJSON(`${BASE}/replays/${id}`),
+  replayAdvanced: (id)                   => fetchJSON(`${BASE}/replays/${id}/advanced`),
   replayFrames:   (id)                   => fetchJSON(`${BASE}/replays/${id}/frames`),
   ballchasing:    (id)                   => fetchJSON(`${BASE}/replays/${id}/ballchasing`),
   setFavorite:    (id, value)            => fetch(`${BASE}/replays/${id}/favorite`, {

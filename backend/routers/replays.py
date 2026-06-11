@@ -68,6 +68,11 @@ def player_to_dict(p: PlayerStat) -> dict:
         "time_low_air":    p.time_low_air,
         "time_high_air":   p.time_high_air,
         "total_distance":  p.total_distance,
+        # Stats avanzadas (NULL hasta que se calculan vía /advanced)
+        "possession_pct":          p.possession_pct,
+        "avg_dist_to_goal":        p.avg_dist_to_goal,
+        "avg_dist_to_teammate":    p.avg_dist_to_teammate,
+        "time_offensive_half_pct": p.time_offensive_half_pct,
     }
 
 
@@ -299,6 +304,94 @@ def get_replay_frames(replay_id: int, db: Session = Depends(get_db)):
         tb = traceback.format_exc()
         logger.error(f"Error cargando frames replay {replay_id}:\n{tb}")
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n\n{tb}")
+
+
+# ── Stats avanzadas de posición/posesión (cálculo perezoso + persistencia) ────
+
+def _set_adv(ps, a):
+    ps.possession_pct          = a.get("possession_pct")
+    ps.avg_dist_to_goal        = a.get("avg_dist_to_goal")
+    ps.avg_dist_to_teammate    = a.get("avg_dist_to_teammate")
+    ps.time_offensive_half_pct = a.get("time_offensive_half_pct")
+
+
+def _assign_advanced_to_stats(stats, adv):
+    """Asigna los resultados (por idx de frames) a los PlayerStat correctos:
+    primero por (nombre, equipo) exacto; luego por orden dentro del equipo para los
+    Car_N / no emparejados. Marca todos como calculados (aunque algún idx no cuadre)."""
+    advp = adv.get("players", {})
+    by_nt = {}
+    for ps in stats:
+        by_nt.setdefault((str(ps.player_name).lower(), ps.team), []).append(ps)
+
+    used = set()
+    leftover = []
+    for idx, a in advp.items():
+        nm = a.get("name") or ""
+        if nm and not nm.startswith("Car_"):
+            lst = by_nt.get((nm.lower(), a.get("team")))
+            if lst:
+                ps = lst.pop(0)
+                _set_adv(ps, a)
+                used.add(id(ps))
+                continue
+        leftover.append(a)
+
+    rem_by_team = {}
+    for ps in stats:
+        if id(ps) not in used:
+            rem_by_team.setdefault(ps.team, []).append(ps)
+    for a in leftover:
+        lst = rem_by_team.get(a.get("team"))
+        if lst:
+            _set_adv(lst.pop(0), a)
+
+    for ps in stats:
+        ps.advanced_computed = True
+
+
+def _team_possession(stats):
+    out = {}
+    for team in (0, 1):
+        vals = [p.possession_pct for p in stats if p.team == team and p.possession_pct is not None]
+        out[team] = round(sum(vals), 1) if vals else None
+    return out
+
+
+@router.get("/replays/{replay_id}/advanced")
+def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
+    """
+    Stats avanzadas de posición/posesión. Cálculo perezoso: la 1ª vez extrae los
+    frames (rrrocket) y persiste; después se sirve de la BD.
+    """
+    import os
+
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Replay no encontrado")
+
+    if any(p.advanced_computed for p in r.players):
+        return {"computed": True,
+                "players": [player_to_dict(p) for p in r.players],
+                "teams": _team_possession(r.players)}
+
+    if not r.file_path or not os.path.exists(r.file_path):
+        return {"computed": False, "reason": "no_local_replay"}
+
+    try:
+        from replay_frames import get_frames_cached
+        from advanced_stats import compute_advanced
+        frames = get_frames_cached(replay_id, r.file_path)
+        adv = compute_advanced(frames)
+    except Exception as e:
+        logger.error(f"Error calculando stats avanzadas replay {replay_id}: {e}")
+        return {"computed": False, "reason": "compute_error", "detail": str(e)}
+
+    _assign_advanced_to_stats(r.players, adv)
+    db.commit()
+    return {"computed": True,
+            "players": [player_to_dict(p) for p in r.players],
+            "teams": adv.get("teams", {})}
 
 
 @router.get("/stats/summary")
