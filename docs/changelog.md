@@ -16,7 +16,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
   - Núcleo puro `backend/advanced_stats.py` + `field_constants.py`; endpoint `GET /api/replays/{id}/advanced`
   - Panel **"Posición y posesión"** en el detalle de partida (se calcula al expandirlo)
   - Grupo nuevo **"Posicionamiento"** en Análisis (medias sobre partidas ya calculadas)
-  - +10 tests (cálculo puro + endpoint perezoso). 103 tests en total.
+  - **Backfill en segundo plano**: un bucle calcula las stats avanzadas de las partidas pendientes sin
+    que tengas que abrirlas (ritmo suave, ~1 cada 12s). Pausable desde Ajustes → **Rendimiento**, con
+    barra de progreso ("X de Y calculadas"). Endpoint `GET /api/stats/advanced/status`.
+  - +12 tests (cálculo puro + endpoint perezoso + status + toggle). 105 tests en total.
 
 > Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
 

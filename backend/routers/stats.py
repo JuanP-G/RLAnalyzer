@@ -499,3 +499,17 @@ def dashboard(
             "win_rate": round(recent_wins / recent_total * 100, 1) if recent_total else 0,
         },
     }
+
+
+@router.get("/stats/advanced/status")
+def advanced_status(db: Session = Depends(get_db)):
+    """Progreso del cálculo de stats avanzadas (para el indicador de Ajustes)."""
+    total = db.query(Replay).count()
+    done = (
+        db.query(Replay.id)
+        .join(PlayerStat, PlayerStat.replay_id == Replay.id)
+        .filter(PlayerStat.advanced_computed == True)
+        .distinct()
+        .count()
+    )
+    return {"total": total, "computed": done, "pending": max(0, total - done)}

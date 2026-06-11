@@ -64,3 +64,15 @@ def test_advanced_compute_error(client, db, fake_replay_file, monkeypatch):
 
 def test_advanced_404(client):
     assert client.get("/api/replays/99999/advanced").status_code == 404
+
+
+def test_advanced_status(client, db):
+    r1 = make_replay(db)
+    make_replay(db)
+    s = client.get("/api/stats/advanced/status").json()
+    assert s["total"] == 2 and s["computed"] == 0 and s["pending"] == 2
+    for p in r1.players:
+        p.advanced_computed = True
+    db.commit(); db.expire_all()
+    s2 = client.get("/api/stats/advanced/status").json()
+    assert s2["computed"] == 1 and s2["pending"] == 1

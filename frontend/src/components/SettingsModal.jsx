@@ -26,12 +26,25 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [restarting, setRestarting] = useState(false)
   const [msg, setMsg]         = useState(null)   // { type:'ok'|'err', text }
 
+  const [status, setStatus] = useState(null)   // progreso de stats avanzadas
+
   useEffect(() => {
     api.getSettings()
       .then(d => { setData(d); setName(d.player_name || ''); setFolder(d.replays_folder || '') })
       .catch(e => setMsg({ type: 'err', text: e.message }))
       .finally(() => setLoading(false))
+    api.advancedStatus().then(setStatus).catch(() => {})
   }, [])
+
+  const toggleBackground = async (val) => {
+    setData(d => ({ ...d, advanced_background: val }))   // optimista
+    try {
+      await api.updateSettings({ advanced_background: val })
+    } catch (e) {
+      setData(d => ({ ...d, advanced_background: !val }))   // revertir
+      setMsg({ type: 'err', text: e.message })
+    }
+  }
 
   // Cerrar con Esc
   useEffect(() => {
@@ -171,6 +184,28 @@ export default function SettingsModal({ onClose, onSaved }) {
                     {data?.folder_exists ? 'La carpeta existe' : 'La carpeta no existe en este equipo'}
                   </span>
                 </div>
+              </Section>
+
+              <Section title="Rendimiento"
+                       desc="Las stats de posición y posesión se calculan de los replays (proceso pesado).">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={data?.advanced_background ?? true}
+                         onChange={e => toggleBackground(e.target.checked)}
+                         className="accent-rl-blue w-4 h-4" />
+                  <span className="text-sm text-gray-300">Calcular stats avanzadas en segundo plano</span>
+                </label>
+                {status && status.total > 0 && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+                      <span>{status.computed} de {status.total} partidas calculadas</span>
+                      <span className="font-mono-num">{Math.round(status.computed / status.total * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#0D2240' }}>
+                      <div className="h-full rounded-full"
+                           style={{ width: `${status.computed / status.total * 100}%`, background: '#00A8FF' }} />
+                    </div>
+                  </div>
+                )}
               </Section>
 
               <Section title="Avanzado" desc="Estos valores solo cambian editando la configuración y reiniciando el backend.">

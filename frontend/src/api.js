@@ -51,6 +51,7 @@ export const api = {
   summary:        ()                     => fetchJSON(`${BASE}/stats/summary`),
   myStats:        ()                     => fetchJSON(`${BASE}/stats/me`),
   analysisFilters:()                     => fetchJSON(`${BASE}/stats/analysis/filters`),
+  advancedStatus: ()                     => fetchJSON(`${BASE}/stats/advanced/status`),
   glossary:       ()                     => fetchJSON(`${BASE}/stats/glossary`),
   analysis:       (filters = {})         => fetchJSON(`${BASE}/stats/analysis${_statsQuery(filters)}`),
   trend:          (filters = {})         => fetchJSON(`${BASE}/stats/trend${_statsQuery(filters)}`),

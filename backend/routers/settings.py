@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api", tags=["settings"])
 class SettingsUpdate(BaseModel):
     player_name: Optional[str] = None
     replays_folder: Optional[str] = None
+    advanced_background: Optional[bool] = None
 
 
 def _known_players() -> list[str]:
@@ -51,6 +52,7 @@ def _effective() -> dict:
         "player_name":    settings_store.get_player_name(),
         "replays_folder": folder,
         "folder_exists":  bool(folder) and os.path.exists(folder),
+        "advanced_background": settings_store.get_advanced_background(),
         # read-only (solo arranque)
         "backend_port":   config.BACKEND_PORT,
         "db_path":        config.DB_PATH,
@@ -138,6 +140,10 @@ def update_settings(payload: SettingsUpdate):
         settings_store.set(settings_store.KEY_REPLAYS_FOLDER, folder)
         _apply_folder_change()
         changed["replays_folder"] = folder
+
+    if payload.advanced_background is not None:
+        settings_store.set(settings_store.KEY_ADVANCED_BG, "true" if payload.advanced_background else "false")
+        changed["advanced_background"] = payload.advanced_background
 
     result = _effective()
     result["changed"] = changed

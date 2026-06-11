@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 KEY_PLAYER_NAME    = "player_name"
 KEY_REPLAYS_FOLDER = "replays_folder"
+KEY_ADVANCED_BG    = "advanced_background"   # "true"|"false": calcular stats avanzadas en 2º plano
 
 _cache: dict = {}
 _loaded = False
@@ -86,3 +87,8 @@ def get_player_name() -> str:
 
 def get_replays_folder() -> str:
     return get(KEY_REPLAYS_FOLDER, _defaults()[KEY_REPLAYS_FOLDER]) or _defaults()[KEY_REPLAYS_FOLDER]
+
+
+def get_advanced_background() -> bool:
+    """¿Calcular las stats avanzadas en segundo plano? (por defecto sí)."""
+    return get(KEY_ADVANCED_BG, "true") != "false"

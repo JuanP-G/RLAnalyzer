@@ -354,8 +354,28 @@ def _team_possession(stats):
     out = {}
     for team in (0, 1):
         vals = [p.possession_pct for p in stats if p.team == team and p.possession_pct is not None]
-        out[team] = round(sum(vals), 1) if vals else None
+        out[team] = {"possession_pct": round(sum(vals), 1) if vals else None}
     return out
+
+
+def compute_and_persist_advanced(db, replay) -> bool:
+    """Extrae frames (rrrocket) + calcula stats avanzadas + persiste en los PlayerStat.
+    Reutilizado por el endpoint perezoso y por el backfill en segundo plano (main.py).
+    Devuelve True si se calcularon."""
+    import os
+    if not replay.file_path or not os.path.exists(replay.file_path):
+        return False
+    try:
+        from replay_frames import get_frames_cached
+        from advanced_stats import compute_advanced
+        frames = get_frames_cached(replay.id, replay.file_path)
+        adv = compute_advanced(frames)
+    except Exception as e:
+        logger.error(f"Error calculando stats avanzadas replay {replay.id}: {e}")
+        return False
+    _assign_advanced_to_stats(replay.players, adv)
+    db.commit()
+    return True
 
 
 @router.get("/replays/{replay_id}/advanced")
@@ -378,20 +398,12 @@ def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
     if not r.file_path or not os.path.exists(r.file_path):
         return {"computed": False, "reason": "no_local_replay"}
 
-    try:
-        from replay_frames import get_frames_cached
-        from advanced_stats import compute_advanced
-        frames = get_frames_cached(replay_id, r.file_path)
-        adv = compute_advanced(frames)
-    except Exception as e:
-        logger.error(f"Error calculando stats avanzadas replay {replay_id}: {e}")
-        return {"computed": False, "reason": "compute_error", "detail": str(e)}
+    if not compute_and_persist_advanced(db, r):
+        return {"computed": False, "reason": "compute_error"}
 
-    _assign_advanced_to_stats(r.players, adv)
-    db.commit()
     return {"computed": True,
             "players": [player_to_dict(p) for p in r.players],
-            "teams": adv.get("teams", {})}
+            "teams": _team_possession(r.players)}
 
 
 @router.get("/stats/summary")

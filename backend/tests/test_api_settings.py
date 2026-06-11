@@ -56,5 +56,11 @@ def test_put_empty_player_name_400(client):
     assert client.put("/api/settings", json={"player_name": "  "}).status_code == 400
 
 
+def test_advanced_background_toggle(client):
+    assert client.get("/api/settings").json()["advanced_background"] is True   # default
+    client.put("/api/settings", json={"advanced_background": False})
+    assert client.get("/api/settings").json()["advanced_background"] is False
+
+
 def test_put_empty_folder_400(client):
     assert client.put("/api/settings", json={"replays_folder": "   "}).status_code == 400

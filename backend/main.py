@@ -147,6 +147,38 @@ async def process_pending_loop():
         await asyncio.sleep(5)
 
 
+async def advanced_backfill_loop():
+    """Calcula en segundo plano las stats avanzadas (posición/posesión) de las partidas
+    que aún no las tienen — una cada ~12s para no saturar (rrrocket es pesado). Así el
+    agregado de Análisis se llena solo sin tener que abrir cada partida. Pausable desde Ajustes."""
+    import os as _os
+    import settings_store
+    from routers.replays import compute_and_persist_advanced
+
+    await asyncio.sleep(25)  # margen tras el arranque
+    while True:
+        try:
+            if settings_store.get_advanced_background():
+                db = SessionLocal()
+                try:
+                    pending_ids = [
+                        row[0] for row in db.query(PlayerStat.replay_id)
+                        .filter(PlayerStat.advanced_computed == False)
+                        .distinct().limit(100).all()
+                    ]
+                    for rid in pending_ids:
+                        r = db.get(Replay, rid)
+                        if r and r.file_path and _os.path.exists(r.file_path):
+                            logger.info(f"Backfill stats avanzadas: replay {rid}")
+                            compute_and_persist_advanced(db, r)
+                            break   # solo una por iteración (ritmo suave)
+                finally:
+                    db.close()
+        except Exception as e:
+            logger.warning(f"Backfill stats avanzadas: {e}")
+        await asyncio.sleep(12)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup y shutdown de la app."""
@@ -174,8 +206,9 @@ async def lifespan(app: FastAPI):
     # Arrancar el watcher de archivos
     watcher.start()
 
-    # Arrancar el bucle de procesado en background
+    # Arrancar los bucles de background: procesado de nuevos replays + backfill avanzadas
     task = asyncio.create_task(process_pending_loop())
+    task_adv = asyncio.create_task(advanced_backfill_loop())
 
     logger.info("Backend listo en http://localhost:8000")
     logger.info("Documentación API en http://localhost:8000/docs")
@@ -184,6 +217,7 @@ async def lifespan(app: FastAPI):
 
     # ── Shutdown ──────────────────────────────────────────────────────────
     task.cancel()
+    task_adv.cancel()
     watcher.stop()
     logger.info("Backend detenido.")
 
