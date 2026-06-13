@@ -100,6 +100,7 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 2. `scan_existing_replays()` — detecta `.replay` en la carpeta que no estén en BD
 3. `ReplayWatcher.start()` — inicia watchdog para detectar nuevos archivos
 4. `asyncio.create_task(process_pending_loop())` — bucle cada 5s que procesa la cola
+5. `asyncio.create_task(advanced_backfill_loop())` — bucle que calcula stats avanzadas pendientes en 2º plano (~1 partida cada 12s; pausable desde Ajustes)
 
 **Módulos:**
 
@@ -107,13 +108,15 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 |---------|----------------|
 | `main.py` | Punto de entrada, lifespan, CORS, routers |
 | `config.py` | `PLAYER_NAME`, `REPLAYS_FOLDER`, `DB_PATH`, `BACKEND_PORT` |
-| `models.py` | SQLAlchemy models: `Replay`, `PlayerStat` |
-| `database.py` | Engine SQLite, `SessionLocal`, `get_db` |
+| `models.py` | SQLAlchemy models: `Replay`, `PlayerStat`, `Setting` |
+| `database.py` | Engine SQLite, `SessionLocal`, `get_db`, `_migrate()` (ALTER TABLE) |
 | `parser.py` | Parseo de `.replay` con subtr-actor-py |
 | `watcher.py` | `ReplayWatcher` (watchdog), cola de pendientes |
-| `replay_frames.py` | Extracción de frames 3D con rrrocket |
-| `routers/replays.py` | Endpoints `/api/replays/*`, `/api/stats/summary`, `/api/stats/me`, `/api/status` |
-| `routers/stats.py` | Análisis y Dashboard: `/api/stats/analysis`, `/trend`, `/dashboard`, `/glossary`, `/analysis/filters` |
+| `replay_frames.py` | Extracción de frames 3D con rrrocket (`_parse_rrrocket`, `get_frames_cached`) |
+| `advanced_stats.py` | `compute_advanced(frames)` — posesión y posicionamiento (puro) |
+| `field_constants.py` | Geometría del campo (porterías, conversión a metros) |
+| `routers/replays.py` | `/api/replays/*`, `/{id}/frames`, `/{id}/advanced`, `/api/stats/summary`, `/me`, `/api/status` |
+| `routers/stats.py` | Análisis y Dashboard: `/api/stats/analysis`, `/trend`, `/dashboard`, `/glossary`, `/analysis/filters`, `/advanced/status` |
 | `routers/players.py` | Historial con/contra otros jugadores: `/api/players/*` |
 | `routers/viewer.py` | Subida y URL de visor de Ballchasing: `/api/replays/{id}/ballchasing` |
 | `routers/profile.py` | Endpoints `/api/profile/*`, caché tracker.gg |
@@ -139,9 +142,22 @@ reinicia el watcher y re-escanea. `DB_PATH`/`BACKEND_PORT`/`TIMEZONE` siguen sie
 > `BACKEND_PORT` (el servidor debe conocer el puerto antes de leer nada). La app **nunca escribe**
 > en `config.py`.
 
+**Stats avanzadas (posición y posesión) — cálculo perezoso + backfill:** `advanced_stats.compute_advanced(frames)`
+calcula, a partir de las posiciones por frame (salida de `_parse_rrrocket`): **posesión** (% de tiempo siendo el
+coche más cercano al balón, 3D), **distancia media a portería propia** y **al compañero** (2D, en metros vía
+`field_constants`) y **% de tiempo en campo rival**. Se exponen como columnas nullable en `player_stats`
+(`possession_pct`, `avg_dist_to_goal`, `avg_dist_to_teammate`, `time_offensive_half_pct`, `advanced_computed`) y
+como grupo `positioning` en `METRICS` (aparecen en Análisis). El cálculo es **perezoso y persistido**:
+`GET /api/replays/{id}/advanced` calcula la 1ª vez (extrae frames con rrrocket, mapea idx→`PlayerStat` por
+nombre/equipo con fallback por orden, persiste) y después sirve de BD. Además, `advanced_backfill_loop()` calcula
+en segundo plano las partidas pendientes (pausable con el setting `advanced_background`); progreso en
+`GET /api/stats/advanced/status`. Matiz: el agregado de Análisis para `positioning` solo refleja partidas ya
+calculadas. **Pendiente de validar**: la orientación del eje de portería en `field_constants.own_goal_y`.
+
 ### 4. Base de datos
 
-SQLite en `data/rl_data.db`. Dos tablas:
+SQLite en `data/rl_data.db`. Tablas: `replays`, `player_stats` y `settings` (key/value de ajustes en runtime).
+Las columnas nuevas se añaden con `ALTER TABLE` en `database._migrate()` (sin perder datos).
 
 #### `replays`
 
@@ -168,9 +184,9 @@ SQLite en `data/rl_data.db`. Dos tablas:
 
 #### `player_stats`
 
-Un registro por jugador por partida. Campos: `player_name`, `platform_id`, `team`, `is_me`, `score`, `goals`, `assists`, `saves`, `shots`, `demos_inflicted`, `boost_collected`, `boost_stolen`, `boost_wasted`, `avg_boost`, `avg_speed`, `time_supersonic`, `time_boost_speed`, `time_slow`, `time_on_ground`, `time_low_air`, `time_high_air`, `total_distance`.
+Un registro por jugador por partida. Campos: `player_name`, `platform_id`, `team`, `is_me`, `score`, `goals`, `assists`, `saves`, `shots`, `demos_inflicted`, `boost_collected`, `boost_stolen`, `boost_wasted`, `avg_boost`, `avg_speed`, `time_supersonic`, `time_boost_speed`, `time_slow`, `time_on_ground`, `time_low_air`, `time_high_air`, `total_distance`. Stats avanzadas (calculadas perezosamente de los frames): `possession_pct`, `avg_dist_to_goal`, `avg_dist_to_teammate`, `time_offensive_half_pct`, `advanced_computed`.
 
-`is_me = True` en el registro del jugador configurado en `PLAYER_NAME`.
+`is_me = True` en el registro del jugador **activo** (de Ajustes; por defecto `config.PLAYER_NAME`). Cambiar de jugador re-etiqueta `is_me`.
 
 ---
 

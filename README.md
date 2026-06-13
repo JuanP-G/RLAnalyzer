@@ -15,6 +15,7 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 - **Lista de partidas** — paginada, con filtros por resultado/modo/favoritas, modo "Comparar" para elegir dos partidas y detalle de cada partida
 - **Historial por jugador** — récord con/contra cualquier jugador visto en tus partidas (win rate, medias comparadas)
 - **Vista detallada** — equipos, jugadores, estadísticas de boost y movimiento, comparativa vs tu media histórica
+- **Stats avanzadas de posición** — posesión (% siendo el más cercano al balón), distancia a tu portería y a tu compañero (sincronía/huecos) y % en campo rival; se calculan de los frames y se rellenan en segundo plano
 - **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables, más un visor embebido de Ballchasing
 - **Perfil** — rangos por modo (1v1, 2v2, 3v3, extras, casual), historial de MMR y estadísticas de carrera
 - **Ajustes en la app** — configura tu jugador y la carpeta de replays desde un modal (rueda dentada), con selector de carpeta nativo; **multi-perfil** (cambia el jugador principal y todo se recalcula al instante, sin reiniciar)
@@ -131,6 +132,8 @@ RLAnalyzer/
 │   ├── parser.py            # Parseo de .replay con subtr-actor
 │   ├── watcher.py           # Vigilancia automática de la carpeta
 │   ├── replay_frames.py     # Extracción frame a frame con rrrocket (para el visor 3D)
+│   ├── advanced_stats.py    # Posesión y posicionamiento (cálculo puro desde los frames)
+│   ├── field_constants.py   # Geometría del campo (porterías, metros)
 │   ├── models.py            # Modelos SQLAlchemy (Replay, PlayerStat, Setting)
 │   ├── database.py          # Conexión a SQLite
 │   ├── tests/               # Batería pytest (60 tests, BD en memoria)
