@@ -24,11 +24,12 @@ export default function App() {
     api.status().then(setStatus).catch(() => setStatus(null))
   }, [])
 
-  // Notificación del sistema cuando se descarta una partida corrupta (pausable en Ajustes).
+  // Notificaciones del sistema sobre el procesado de replays (cada tipo pausable en Ajustes).
   useEffect(() => {
     let seq = 0
-    let notify = true
     let timer = null
+    // Toggle por tipo de aviso; el backend ya manda title/body localizados.
+    const enabled = { corrupt: true, match_added: true, parse_error: true }
 
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {})
@@ -36,13 +37,11 @@ export default function App() {
 
     const poll = async () => {
       try {
-        const data = await api.rejectedReplays(seq)
+        const data = await api.notifications(seq)
         for (const ev of data.events || []) {
-          if (notify && typeof Notification !== 'undefined') {
+          if (enabled[ev.type] !== false && typeof Notification !== 'undefined') {
             try {
-              new Notification('Partida no añadida', {
-                body: `Replay corrupto o sin datos: ${ev.file_name}`,
-              })
+              new Notification(ev.title, { body: ev.body })
             } catch { /* permiso denegado / no soportado */ }
           }
         }
@@ -50,11 +49,15 @@ export default function App() {
       } catch { /* backend caído: reintentar luego */ }
     }
 
-    // Baseline: no notificar la cola previa; leer el flag y arrancar el sondeo
+    // Baseline: no notificar la cola previa; leer los flags y arrancar el sondeo
     api.getSettings()
-      .then(s => { notify = s.notify_corrupt !== false })
+      .then(s => {
+        enabled.corrupt     = s.notify_corrupt     !== false
+        enabled.match_added = s.notify_match_added !== false
+        enabled.parse_error = s.notify_parse_error !== false
+      })
       .catch(() => {})
-    api.rejectedReplays(0)
+    api.notifications(0)
       .then(d => { seq = d.last_seq || 0 })
       .catch(() => {})
       .finally(() => { timer = setInterval(poll, 30000) })

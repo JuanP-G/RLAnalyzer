@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 KEY_PLAYER_NAME    = "player_name"
 KEY_REPLAYS_FOLDER = "replays_folder"
-KEY_ADVANCED_BG    = "advanced_background"   # "true"|"false": calcular stats avanzadas en 2º plano
-KEY_NOTIFY_CORRUPT = "notify_corrupt"        # "true"|"false": notificar partidas corruptas/no añadidas
+KEY_ADVANCED_BG      = "advanced_background"   # "true"|"false": calcular stats avanzadas en 2º plano
+KEY_NOTIFY_CORRUPT   = "notify_corrupt"        # "true"|"false": notificar partidas corruptas/no añadidas
+KEY_NOTIFY_ADDED     = "notify_match_added"    # "true"|"false": notificar nuevas partidas añadidas
+KEY_NOTIFY_ERROR     = "notify_parse_error"    # "true"|"false": notificar errores al procesar un replay
 
 _cache: dict = {}
 _loaded = False
@@ -98,3 +100,13 @@ def get_advanced_background() -> bool:
 def get_notify_corrupt() -> bool:
     """¿Notificar cuando se descarta una partida corrupta/no válida? (por defecto sí)."""
     return get(KEY_NOTIFY_CORRUPT, "true") != "false"
+
+
+def get_notify_match_added() -> bool:
+    """¿Notificar cuando se añade una nueva partida procesada? (por defecto sí)."""
+    return get(KEY_NOTIFY_ADDED, "true") != "false"
+
+
+def get_notify_parse_error() -> bool:
+    """¿Notificar cuando un replay no se puede procesar? (por defecto sí)."""
+    return get(KEY_NOTIFY_ERROR, "true") != "false"

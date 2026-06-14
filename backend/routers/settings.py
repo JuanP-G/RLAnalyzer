@@ -28,6 +28,8 @@ class SettingsUpdate(BaseModel):
     replays_folder: Optional[str] = None
     advanced_background: Optional[bool] = None
     notify_corrupt: Optional[bool] = None
+    notify_match_added: Optional[bool] = None
+    notify_parse_error: Optional[bool] = None
 
 
 def _known_players() -> list[str]:
@@ -55,6 +57,8 @@ def _effective() -> dict:
         "folder_exists":  bool(folder) and os.path.exists(folder),
         "advanced_background": settings_store.get_advanced_background(),
         "notify_corrupt":     settings_store.get_notify_corrupt(),
+        "notify_match_added": settings_store.get_notify_match_added(),
+        "notify_parse_error": settings_store.get_notify_parse_error(),
         # read-only (solo arranque)
         "backend_port":   config.BACKEND_PORT,
         "db_path":        config.DB_PATH,
@@ -150,6 +154,14 @@ def update_settings(payload: SettingsUpdate):
     if payload.notify_corrupt is not None:
         settings_store.set(settings_store.KEY_NOTIFY_CORRUPT, "true" if payload.notify_corrupt else "false")
         changed["notify_corrupt"] = payload.notify_corrupt
+
+    if payload.notify_match_added is not None:
+        settings_store.set(settings_store.KEY_NOTIFY_ADDED, "true" if payload.notify_match_added else "false")
+        changed["notify_match_added"] = payload.notify_match_added
+
+    if payload.notify_parse_error is not None:
+        settings_store.set(settings_store.KEY_NOTIFY_ERROR, "true" if payload.notify_parse_error else "false")
+        changed["notify_parse_error"] = payload.notify_parse_error
 
     result = _effective()
     result["changed"] = changed

@@ -23,9 +23,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
   < 2 jugadores: corruptos, freeplay, menú) **ya no se guardan** en la BD; se **notifica** con un
   aviso del sistema (toggle en Ajustes → Notificaciones) vía `GET /api/replays/rejected`. Al arrancar
   se **eliminan** las que ya estuvieran guardadas (`delete_invalid_replays`).
+- **Apartado de Notificaciones** (Ajustes): feed de avisos del sistema con un toggle por tipo —
+  **nueva partida añadida** (mapa + resultado), **partida corrupta no añadida** y **error al procesar
+  un replay**. El backend publica un feed tipado en `GET /api/notifications` (cada evento trae
+  `type`/`title`/`body`); el frontend lo sondea y muestra solo los tipos activados. Flags nuevos
+  `notify_match_added` y `notify_parse_error` (por defecto activos).
 - **Backfill robusto**: las partidas que no se pueden calcular (sin `.replay` local o error) se marcan
   como intentadas → el progreso llega al 100% y el bucle deja de reintentarlas.
-  - Tests de validación/limpieza/rechazos y de los toggles. **109 tests** en total.
+- **Detalle UI**: el icono del modal de Ajustes ahora coincide con la rueda dentada del sidebar.
+  - Tests de validación/limpieza/rechazos, del feed de notificaciones y de los toggles. **113 tests** en total.
 
 > Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
 

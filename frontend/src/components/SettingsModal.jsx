@@ -46,12 +46,13 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  const toggleNotify = async (val) => {
-    setData(d => ({ ...d, notify_corrupt: val }))
+  // Toggle genérico para cualquier flag de notificación (optimista + revertir si falla).
+  const toggleNotify = async (key, val) => {
+    setData(d => ({ ...d, [key]: val }))
     try {
-      await api.updateSettings({ notify_corrupt: val })
+      await api.updateSettings({ [key]: val })
     } catch (e) {
-      setData(d => ({ ...d, notify_corrupt: !val }))
+      setData(d => ({ ...d, [key]: !val }))
       setMsg({ type: 'err', text: e.message })
     }
   }
@@ -218,15 +219,30 @@ export default function SettingsModal({ onClose, onSaved }) {
                 )}
               </Section>
 
-              <Section title="Notificaciones" desc="Avisos del sistema sobre el procesado de replays.">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={data?.notify_corrupt ?? true}
-                         onChange={e => toggleNotify(e.target.checked)}
-                         className="accent-rl-blue w-4 h-4" />
-                  <span className="text-sm text-gray-300">Avisar de partidas corruptas no añadidas</span>
-                </label>
-                <p className="text-[11px] text-gray-500 mt-1">
+              <Section title="Notificaciones" desc="Avisos del sistema sobre el procesado de replays. Actívalos por separado.">
+                <div className="space-y-2.5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={data?.notify_match_added ?? true}
+                           onChange={e => toggleNotify('notify_match_added', e.target.checked)}
+                           className="accent-rl-blue w-4 h-4" />
+                    <span className="text-sm text-gray-300">Avisar de nuevas partidas añadidas</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={data?.notify_corrupt ?? true}
+                           onChange={e => toggleNotify('notify_corrupt', e.target.checked)}
+                           className="accent-rl-blue w-4 h-4" />
+                    <span className="text-sm text-gray-300">Avisar de partidas corruptas no añadidas</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={data?.notify_parse_error ?? true}
+                           onChange={e => toggleNotify('notify_parse_error', e.target.checked)}
+                           className="accent-rl-blue w-4 h-4" />
+                    <span className="text-sm text-gray-300">Avisar de errores al procesar un replay</span>
+                  </label>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">
                   Las repeticiones sin datos (corruptas, freeplay o de menú) no se guardan en la base de datos.
+                  Los errores son replays que no se pudieron leer.
                 </p>
               </Section>
 

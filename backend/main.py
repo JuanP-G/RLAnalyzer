@@ -116,6 +116,14 @@ def save_replay_to_db(data: dict):
         db.commit()
         logger.info(f"Replay guardado: {data['file_name']} — {data['result']}")
 
+        # Notificar la nueva partida (marcador desde la perspectiva del jugador)
+        t0, t1 = data.get("team0_score"), data.get("team1_score")
+        score = None
+        if t0 is not None and t1 is not None:
+            mine, other = (t0, t1) if data.get("my_team") == 0 else (t1, t0)
+            score = f"{mine}-{other}"
+        events.add_match_added(data.get("map_name"), data.get("result"), score)
+
     except Exception as e:
         db.rollback()
         logger.exception(f"Error guardando replay: {e}")
@@ -151,6 +159,9 @@ async def process_pending_loop():
                 mark_processed(file_path)
             else:
                 logger.warning(f"No se pudo parsear: {file_path}")
+                import events
+                events.add_parse_error(os.path.basename(file_path))
+                mark_processed(file_path)   # no reintentar en bucle un replay ilegible
         await asyncio.sleep(5)
 
 

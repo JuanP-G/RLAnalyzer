@@ -79,6 +79,7 @@ export const api = {
   replay:         (id)                   => fetchJSON(`${BASE}/replays/${id}`),
   replayAdvanced: (id)                   => fetchJSON(`${BASE}/replays/${id}/advanced`),
   rejectedReplays:(since = 0)            => fetchJSON(`${BASE}/replays/rejected?since=${since}`),
+  notifications:  (since = 0)            => fetchJSON(`${BASE}/notifications?since=${since}`),
   replayFrames:   (id)                   => fetchJSON(`${BASE}/replays/${id}/frames`),
   ballchasing:    (id)                   => fetchJSON(`${BASE}/replays/${id}/ballchasing`),
   setFavorite:    (id, value)            => fetch(`${BASE}/replays/${id}/favorite`, {

@@ -117,6 +117,15 @@ def get_rejected(since: int = 0):
     return {"events": events.recent_rejected(since), "last_seq": events.last_seq()}
 
 
+@router.get("/notifications")
+def get_notifications(since: int = 0):
+    """Feed de avisos para la UI (partidas añadidas, corruptas no añadidas, errores de
+    procesado). Cada evento trae `type`, `title` y `body`; el frontend decide si lo muestra
+    según los toggles de Ajustes. `since` evita re-notificar lo ya visto."""
+    import events
+    return {"events": events.recent(since), "last_seq": events.last_seq()}
+
+
 class FavoritePayload(BaseModel):
     value: bool
 

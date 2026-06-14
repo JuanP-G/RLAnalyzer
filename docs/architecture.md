@@ -107,6 +107,12 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 (corruptos, freeplay, menú): `save_replay_to_db` **no los inserta**, los registra en `events` y el frontend
 muestra una **notificación del sistema** (toggle `notify_corrupt` en Ajustes). Las ya guardadas se borran al arrancar.
 
+**Feed de notificaciones:** `events` mantiene una cola en memoria de avisos tipados — `match_added`
+(partida nueva añadida), `corrupt` (no añadida) y `parse_error` (replay ilegible). `save_replay_to_db`
+y `process_pending_loop` los publican; el frontend sondea `GET /api/notifications?since=<seq>` cada 30s
+y muestra solo los tipos activados en Ajustes (`notify_match_added` / `notify_corrupt` / `notify_parse_error`).
+`GET /api/replays/rejected` sigue existiendo como el subconjunto `corrupt` del mismo feed.
+
 **Módulos:**
 
 | Archivo | Responsabilidad |
@@ -119,7 +125,7 @@ muestra una **notificación del sistema** (toggle `notify_corrupt` en Ajustes). 
 | `watcher.py` | `ReplayWatcher` (watchdog), cola de pendientes |
 | `replay_frames.py` | Extracción de frames 3D con rrrocket (`_parse_rrrocket`, `get_frames_cached`) |
 | `advanced_stats.py` | `compute_advanced(frames)` — posesión y posicionamiento (puro) |
-| `events.py` | `is_valid_match()` (rechaza corruptos/no-partidas) + registro de rechazos para notificar |
+| `events.py` | `is_valid_match()` (rechaza corruptos/no-partidas) + feed en memoria de notificaciones tipadas (añadidas/corruptas/errores) |
 | `field_constants.py` | Geometría del campo (porterías, conversión a metros) |
 | `routers/replays.py` | `/api/replays/*`, `/{id}/frames`, `/{id}/advanced`, `/api/stats/summary`, `/me`, `/api/status` |
 | `routers/stats.py` | Análisis y Dashboard: `/api/stats/analysis`, `/trend`, `/dashboard`, `/glossary`, `/analysis/filters`, `/advanced/status` |

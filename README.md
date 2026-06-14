@@ -19,6 +19,7 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 - **Visor 3D** — reproduce el replay frame a frame con campo bicolor, coches 3D con etiquetas, efectos de gol y timeline con marcadores clicables, más un visor embebido de Ballchasing
 - **Perfil** — rangos por modo (1v1, 2v2, 3v3, extras, casual), historial de MMR y estadísticas de carrera
 - **Ajustes en la app** — configura tu jugador y la carpeta de replays desde un modal (rueda dentada), con selector de carpeta nativo; **multi-perfil** (cambia el jugador principal y todo se recalcula al instante, sin reiniciar)
+- **Notificaciones del sistema** — avisos cuando se añade una partida nueva, cuando se descarta una corrupta (no se guarda) o cuando un replay no se puede procesar; cada tipo se activa por separado en Ajustes
 - **Offline-first** — sirve los últimos datos conocidos cuando no hay conexión
 - **App de escritorio** — ventana nativa de Windows sin necesidad de abrir el navegador; el backend se puede reiniciar en segundo plano sin cerrar la app
 

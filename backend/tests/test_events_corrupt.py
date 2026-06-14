@@ -33,3 +33,30 @@ def test_rejected_endpoint(client):
     assert any(e["file_name"] == "corrupta_xyz.replay" for e in out["events"])
     # ?since=last_seq → nada nuevo
     assert client.get(f"/api/replays/rejected?since={out['last_seq']}").json()["events"] == []
+
+
+@pytest.mark.unit
+def test_event_types():
+    events.add_match_added("DFH Stadium", "win", "3-1")
+    events.add_parse_error("ilegible.replay")
+    types = {e["type"] for e in events.recent(0)}
+    assert events.MATCH_ADDED in types
+    assert events.PARSE_ERROR in types
+    # cada aviso trae title/body listos para mostrar
+    for e in events.recent(0):
+        assert e["title"] and e["body"]
+
+
+def test_notifications_endpoint(client):
+    events.add_match_added("Mannfield", "loss", "1-4")
+    out = client.get("/api/notifications").json()
+    assert out["last_seq"] >= 1
+    added = [e for e in out["events"] if e["type"] == events.MATCH_ADDED]
+    assert any("Mannfield" in e["body"] for e in added)
+    # el feed mezcla tipos; /replays/rejected solo devuelve los corruptos
+    events.add_rejected("rota.replay")
+    rejected = client.get("/api/replays/rejected").json()["events"]
+    assert all(e["type"] == events.CORRUPT for e in rejected)
+    # ?since=last_seq → nada nuevo
+    seq = client.get("/api/notifications").json()["last_seq"]
+    assert client.get(f"/api/notifications?since={seq}").json()["events"] == []

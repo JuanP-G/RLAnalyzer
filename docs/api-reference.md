@@ -170,9 +170,17 @@ Comprueba si rrrocket está instalado y si el primer replay de la BD tiene su ar
 
 ### `GET /api/replays/rejected`
 
-Replays rechazados recientemente (corruptos / no-partidas: sin mapa o < 2 jugadores), para que la UI los notifique. Acepta `?since=<seq>` para traer solo los nuevos.
+Replays rechazados recientemente (corruptos / no-partidas: sin mapa o < 2 jugadores), para que la UI los notifique. Acepta `?since=<seq>` para traer solo los nuevos. Es el subconjunto `type == "corrupt"` del feed de `/api/notifications`.
 
-**Respuesta:** `{ "events": [ { "seq": 12, "file_name": "X.replay", "ts": 1718200000.0 } ], "last_seq": 12 }`
+**Respuesta:** `{ "events": [ { "seq": 12, "type": "corrupt", "title": "Partida no añadida", "body": "...", "file_name": "X.replay", "ts": 1718200000.0 } ], "last_seq": 12 }`
+
+---
+
+### `GET /api/notifications`
+
+Feed de avisos del sistema para la UI: nuevas partidas añadidas, partidas corruptas no añadidas y errores al procesar un replay. Cada evento trae `type` (`match_added` | `corrupt` | `parse_error`), `title` y `body` ya listos para mostrar; el frontend decide si lo muestra según los toggles de Ajustes. Acepta `?since=<seq>` para traer solo los nuevos. Cola en memoria (no se persiste).
+
+**Respuesta:** `{ "events": [ { "seq": 13, "type": "match_added", "title": "Nueva partida añadida", "body": "DFH Stadium · Victoria 3-1", "ts": 1718200000.0 } ], "last_seq": 13 }`
 
 ---
 
@@ -453,6 +461,8 @@ Devuelve los valores efectivos, los read-only (solo arranque) y los jugadores co
   "timezone": "Europe/Madrid",
   "advanced_background": true,
   "notify_corrupt": true,
+  "notify_match_added": true,
+  "notify_parse_error": true,
   "known_players": ["GustoffotsuG", "ldz150", "..."]
 }
 ```
@@ -470,6 +480,8 @@ Actualiza el jugador principal, la carpeta de replays y/o el cálculo en segundo
 - Cambiar `replays_folder` → reinicia el watcher y re-escanea la nueva carpeta.
 - `advanced_background` (bool) → activa/pausa el cálculo de stats avanzadas en segundo plano.
 - `notify_corrupt` (bool) → activa/pausa la notificación de partidas corruptas no añadidas.
+- `notify_match_added` (bool) → activa/pausa la notificación de nuevas partidas añadidas.
+- `notify_parse_error` (bool) → activa/pausa la notificación de errores al procesar un replay.
 - **400** si `player_name` o `replays_folder` quedan vacíos.
 
 **Respuesta:** igual que `GET /api/settings` más `"changed": { ... }` con lo modificado.

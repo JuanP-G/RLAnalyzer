@@ -21,7 +21,7 @@ Marcadores: `py -m pytest tests -m unit` (lógica pura, rápido) y `-m api` (end
 
 Cobertura: `py -m pytest --cov=. --cov-report=term-missing` (requiere `pytest-cov`, ya en `requirements-dev.txt`).
 
-**Cobertura actual (109 tests):**
+**Cobertura actual (113 tests):**
 - **Unitarios:** `stats._metric_value`/`_avg`/`_is_abnormal`/`_parse_date`, `database._playlist_to_category`,
   `players._group_stats`, `profile._parse`/`_first`/`_extract_json_at` (incl. que el percentil/rank salen de
   `rating.*`, no de `tier.*`, y la racha negativa en derrotas), `settings_store` (default/set/invalidate).
@@ -43,6 +43,9 @@ Cobertura: `py -m pytest --cov=. --cov-report=term-missing` (requiere `pytest-co
 - **Stats avanzadas** (`advanced_stats.compute_advanced`, puro): posesión (coche más cercano al balón),
   distancias a portería/compañero, % en campo rival, con posiciones conocidas; y endpoint perezoso
   `/api/replays/{id}/advanced` (calcula+persiste, 2ª llamada no recalcula, sin .replay local, error, 404).
+- **Notificaciones** (`events`): validación de partidas, limpieza/rechazos, feed tipado
+  (`match_added`/`corrupt`/`parse_error` con title+body), endpoints `/api/notifications` y
+  `/api/replays/rejected` (subconjunto corrupt), y los toggles `notify_*` en `/api/settings`.
 
 Infra: `backend/conftest.py` (fixtures `engine`/`db`/`client` + `_patch_sessionlocal`; `fake_subtr`,
 `fake_replay_file`, `frames_cache_tmp` para mockear los nativos), `backend/tests/factories.py`
