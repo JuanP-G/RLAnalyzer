@@ -134,9 +134,9 @@ export default function SettingsModal({ onClose, onSaved }) {
              style={{ background: '#071829', borderBottom: '1px solid #122A4D' }}>
           <h2 className="font-display font-bold text-white uppercase tracking-wider text-sm flex items-center gap-2">
             <span className="text-rl-blue">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
-                <circle cx="8" cy="8" r="2.4"/>
-                <path d="M8 1.2v2 M8 12.8v2 M1.2 8h2 M12.8 8h2 M3.2 3.2l1.4 1.4 M11.4 11.4l1.4 1.4 M12.8 3.2l-1.4 1.4 M4.6 11.4l-1.4 1.4" opacity="0.85"/>
+              {/* Mismo icono que el botón del Sidebar (rueda dentada Material) */}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.32-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.31-.07.63-.07.94 0 .31.02.63.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.31.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.06.24.25.41.49.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
               </svg>
             </span>
             Ajustes
