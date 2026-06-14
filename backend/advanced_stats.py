@@ -64,7 +64,9 @@ def compute_advanced(frames: dict) -> dict:
                 continue
             team = teams[idx]
             goal_sum[idx] += _dist2d(cp, (0.0, own_goal_y(team))); goal_cnt[idx] += 1
-            attack_sign = 1 if team == 0 else -1   # team0 ataca +Y, team1 -Y
+            # Se ataca alejándose de la portería propia → derivar el signo de own_goal_y
+            # (una sola fuente de verdad del eje: corregirla ahí ajusta también esto).
+            attack_sign = -1 if own_goal_y(team) > 0 else 1
             pos_cnt[idx] += 1
             if cp[1] * attack_sign > 0:
                 off_cnt[idx] += 1

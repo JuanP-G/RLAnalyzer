@@ -18,8 +18,11 @@ UU_PER_METER  = 100.0
 
 
 def own_goal_y(team: int) -> float:
-    """Coordenada Y de la portería propia. VERIFICAR la orientación con un replay
-    real (el equipo defensor debe salir con menor distancia a su portería)."""
+    """Coordenada Y de la portería propia y ÚNICA fuente de verdad del eje de campo:
+    `advanced_stats` deriva de aquí el sentido de ataque (se ataca alejándose de la
+    portería propia), así que corregir esta línea ajusta a la vez avg_dist_to_goal y
+    time_offensive_half_pct. VERIFICAR la orientación con un replay real (el equipo
+    defensor debe salir con menor distancia a su portería)."""
     return -GOAL_Y if team == 0 else GOAL_Y
 
 
