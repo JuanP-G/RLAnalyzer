@@ -19,7 +19,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
   - **Backfill en segundo plano**: un bucle calcula las stats avanzadas de las partidas pendientes sin
     que tengas que abrirlas (ritmo suave, ~1 cada 12s). Pausable desde Ajustes → **Rendimiento**, con
     barra de progreso ("X de Y calculadas"). Endpoint `GET /api/stats/advanced/status`.
-  - +12 tests (cálculo puro + endpoint perezoso + status + toggle). 105 tests en total.
+- **Partidas corruptas / no-partidas**: los replays que no parsean como partida real (sin mapa o
+  < 2 jugadores: corruptos, freeplay, menú) **ya no se guardan** en la BD; se **notifica** con un
+  aviso del sistema (toggle en Ajustes → Notificaciones) vía `GET /api/replays/rejected`. Al arrancar
+  se **eliminan** las que ya estuvieran guardadas (`delete_invalid_replays`).
+- **Backfill robusto**: las partidas que no se pueden calcular (sin `.replay` local o error) se marcan
+  como intentadas → el progreso llega al 100% y el bucle deja de reintentarlas.
+  - Tests de validación/limpieza/rechazos y de los toggles. **109 tests** en total.
 
 > Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
 

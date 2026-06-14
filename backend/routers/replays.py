@@ -109,6 +109,14 @@ def list_replays(
     }
 
 
+@router.get("/replays/rejected")
+def get_rejected(since: int = 0):
+    """Replays rechazados recientemente (corruptos/no-partidas), para notificarlos en la UI.
+    Declarado antes de /replays/{replay_id} para que no lo capture la ruta dinámica."""
+    import events
+    return {"events": events.recent_rejected(since), "last_seq": events.last_seq()}
+
+
 class FavoritePayload(BaseModel):
     value: bool
 
@@ -404,6 +412,20 @@ def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
     return {"computed": True,
             "players": [player_to_dict(p) for p in r.players],
             "teams": _team_possession(r.players)}
+
+
+# ── Partidas no válidas (corruptas / no-partidas) ────────────────────────────
+
+def delete_invalid_replays(db) -> int:
+    """Borra las partidas que no son partidas reales (sin mapa o con < 2 jugadores).
+    Devuelve cuántas se eliminaron. Se ejecuta al arrancar para limpiar las que ya
+    estuvieran guardadas."""
+    invalid = [r for r in db.query(Replay).all() if not r.map_name or len(r.players) < 2]
+    for r in invalid:
+        db.delete(r)
+    if invalid:
+        db.commit()
+    return len(invalid)
 
 
 @router.get("/stats/summary")

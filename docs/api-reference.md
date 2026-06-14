@@ -168,6 +168,14 @@ Comprueba si rrrocket está instalado y si el primer replay de la BD tiene su ar
 
 ---
 
+### `GET /api/replays/rejected`
+
+Replays rechazados recientemente (corruptos / no-partidas: sin mapa o < 2 jugadores), para que la UI los notifique. Acepta `?since=<seq>` para traer solo los nuevos.
+
+**Respuesta:** `{ "events": [ { "seq": 12, "file_name": "X.replay", "ts": 1718200000.0 } ], "last_seq": 12 }`
+
+---
+
 ### `GET /api/replays/{replay_id}/advanced`
 
 Stats avanzadas de posición/posesión. **Cálculo perezoso**: la 1ª vez extrae los frames (rrrocket), calcula y persiste; después sirve de BD.
@@ -444,6 +452,7 @@ Devuelve los valores efectivos, los read-only (solo arranque) y los jugadores co
   "db_path": "C:\\...\\data\\rl_data.db",
   "timezone": "Europe/Madrid",
   "advanced_background": true,
+  "notify_corrupt": true,
   "known_players": ["GustoffotsuG", "ldz150", "..."]
 }
 ```
@@ -460,6 +469,7 @@ Actualiza el jugador principal, la carpeta de replays y/o el cálculo en segundo
 - Cambiar `player_name` → re-etiqueta `is_me` en `player_stats` y **recalcula `my_team`/`result`** desde la perspectiva del nuevo jugador; invalida la caché de perfil.
 - Cambiar `replays_folder` → reinicia el watcher y re-escanea la nueva carpeta.
 - `advanced_background` (bool) → activa/pausa el cálculo de stats avanzadas en segundo plano.
+- `notify_corrupt` (bool) → activa/pausa la notificación de partidas corruptas no añadidas.
 - **400** si `player_name` o `replays_folder` quedan vacíos.
 
 **Respuesta:** igual que `GET /api/settings` más `"changed": { ... }` con lo modificado.

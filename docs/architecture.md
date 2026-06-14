@@ -100,7 +100,12 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 2. `scan_existing_replays()` — detecta `.replay` en la carpeta que no estén en BD
 3. `ReplayWatcher.start()` — inicia watchdog para detectar nuevos archivos
 4. `asyncio.create_task(process_pending_loop())` — bucle cada 5s que procesa la cola
-5. `asyncio.create_task(advanced_backfill_loop())` — bucle que calcula stats avanzadas pendientes en 2º plano (~1 partida cada 12s; pausable desde Ajustes)
+5. `delete_invalid_replays()` — elimina partidas no válidas (corruptas/no-partidas) que ya estuvieran en la BD
+6. `asyncio.create_task(advanced_backfill_loop())` — bucle que calcula stats avanzadas pendientes en 2º plano (~1 partida cada 12s; pausable desde Ajustes; las no calculables se marcan intentadas para llegar al 100%)
+
+**Validación de partidas:** `events.is_valid_match(data)` rechaza replays sin mapa o con < 2 jugadores
+(corruptos, freeplay, menú): `save_replay_to_db` **no los inserta**, los registra en `events` y el frontend
+muestra una **notificación del sistema** (toggle `notify_corrupt` en Ajustes). Las ya guardadas se borran al arrancar.
 
 **Módulos:**
 
@@ -114,6 +119,7 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 | `watcher.py` | `ReplayWatcher` (watchdog), cola de pendientes |
 | `replay_frames.py` | Extracción de frames 3D con rrrocket (`_parse_rrrocket`, `get_frames_cached`) |
 | `advanced_stats.py` | `compute_advanced(frames)` — posesión y posicionamiento (puro) |
+| `events.py` | `is_valid_match()` (rechaza corruptos/no-partidas) + registro de rechazos para notificar |
 | `field_constants.py` | Geometría del campo (porterías, conversión a metros) |
 | `routers/replays.py` | `/api/replays/*`, `/{id}/frames`, `/{id}/advanced`, `/api/stats/summary`, `/me`, `/api/status` |
 | `routers/stats.py` | Análisis y Dashboard: `/api/stats/analysis`, `/trend`, `/dashboard`, `/glossary`, `/analysis/filters`, `/advanced/status` |

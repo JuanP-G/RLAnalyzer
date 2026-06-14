@@ -62,5 +62,11 @@ def test_advanced_background_toggle(client):
     assert client.get("/api/settings").json()["advanced_background"] is False
 
 
+def test_notify_corrupt_toggle(client):
+    assert client.get("/api/settings").json()["notify_corrupt"] is True   # default
+    client.put("/api/settings", json={"notify_corrupt": False})
+    assert client.get("/api/settings").json()["notify_corrupt"] is False
+
+
 def test_put_empty_folder_400(client):
     assert client.put("/api/settings", json={"replays_folder": "   "}).status_code == 400

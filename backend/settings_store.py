@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 KEY_PLAYER_NAME    = "player_name"
 KEY_REPLAYS_FOLDER = "replays_folder"
 KEY_ADVANCED_BG    = "advanced_background"   # "true"|"false": calcular stats avanzadas en 2º plano
+KEY_NOTIFY_CORRUPT = "notify_corrupt"        # "true"|"false": notificar partidas corruptas/no añadidas
 
 _cache: dict = {}
 _loaded = False
@@ -92,3 +93,8 @@ def get_replays_folder() -> str:
 def get_advanced_background() -> bool:
     """¿Calcular las stats avanzadas en segundo plano? (por defecto sí)."""
     return get(KEY_ADVANCED_BG, "true") != "false"
+
+
+def get_notify_corrupt() -> bool:
+    """¿Notificar cuando se descarta una partida corrupta/no válida? (por defecto sí)."""
+    return get(KEY_NOTIFY_CORRUPT, "true") != "false"

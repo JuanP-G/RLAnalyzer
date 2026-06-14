@@ -24,6 +24,44 @@ export default function App() {
     api.status().then(setStatus).catch(() => setStatus(null))
   }, [])
 
+  // Notificación del sistema cuando se descarta una partida corrupta (pausable en Ajustes).
+  useEffect(() => {
+    let seq = 0
+    let notify = true
+    let timer = null
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+
+    const poll = async () => {
+      try {
+        const data = await api.rejectedReplays(seq)
+        for (const ev of data.events || []) {
+          if (notify && typeof Notification !== 'undefined') {
+            try {
+              new Notification('Partida no añadida', {
+                body: `Replay corrupto o sin datos: ${ev.file_name}`,
+              })
+            } catch { /* permiso denegado / no soportado */ }
+          }
+        }
+        if (data.last_seq != null) seq = data.last_seq
+      } catch { /* backend caído: reintentar luego */ }
+    }
+
+    // Baseline: no notificar la cola previa; leer el flag y arrancar el sondeo
+    api.getSettings()
+      .then(s => { notify = s.notify_corrupt !== false })
+      .catch(() => {})
+    api.rejectedReplays(0)
+      .then(d => { seq = d.last_seq || 0 })
+      .catch(() => {})
+      .finally(() => { timer = setInterval(poll, 30000) })
+
+    return () => { if (timer) clearInterval(timer) }
+  }, [])
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg-primary">
       {/* Barra de título personalizada (solo visible en Electron) */}

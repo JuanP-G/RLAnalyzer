@@ -46,6 +46,16 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
+  const toggleNotify = async (val) => {
+    setData(d => ({ ...d, notify_corrupt: val }))
+    try {
+      await api.updateSettings({ notify_corrupt: val })
+    } catch (e) {
+      setData(d => ({ ...d, notify_corrupt: !val }))
+      setMsg({ type: 'err', text: e.message })
+    }
+  }
+
   // Cerrar con Esc
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -206,6 +216,18 @@ export default function SettingsModal({ onClose, onSaved }) {
                     </div>
                   </div>
                 )}
+              </Section>
+
+              <Section title="Notificaciones" desc="Avisos del sistema sobre el procesado de replays.">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={data?.notify_corrupt ?? true}
+                         onChange={e => toggleNotify(e.target.checked)}
+                         className="accent-rl-blue w-4 h-4" />
+                  <span className="text-sm text-gray-300">Avisar de partidas corruptas no añadidas</span>
+                </label>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Las repeticiones sin datos (corruptas, freeplay o de menú) no se guardan en la base de datos.
+                </p>
               </Section>
 
               <Section title="Avanzado" desc="Estos valores solo cambian editando la configuración y reiniciando el backend.">

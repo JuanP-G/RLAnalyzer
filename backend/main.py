@@ -50,8 +50,15 @@ watcher = ReplayWatcher()
 
 def save_replay_to_db(data: dict):
     """Guarda los datos parseados de un replay en la base de datos."""
+    import events
     db = SessionLocal()
     try:
+        # ── Partida no válida (corrupta / freeplay / menú) → no se añade, se notifica ──
+        if not events.is_valid_match(data):
+            logger.warning(f"Replay no válido (corrupto/no-partida), no se añade: {data.get('file_name')}")
+            events.add_rejected(data.get("file_name") or data.get("file_path"))
+            return
+
         # Evitar duplicados
         existing = db.query(Replay).filter(Replay.file_path == data["file_path"]).first()
         if existing:
@@ -168,10 +175,21 @@ async def advanced_backfill_loop():
                     ]
                     for rid in pending_ids:
                         r = db.get(Replay, rid)
-                        if r and r.file_path and _os.path.exists(r.file_path):
-                            logger.info(f"Backfill stats avanzadas: replay {rid}")
-                            compute_and_persist_advanced(db, r)
-                            break   # solo una por iteración (ritmo suave)
+                        if not r:
+                            continue
+                        # Sin .replay local → no se puede calcular aquí; marcar intentada
+                        # para que el backfill no la reintente eternamente (llega al 100%).
+                        if not r.file_path or not _os.path.exists(r.file_path):
+                            for p in r.players:
+                                p.advanced_computed = True
+                            db.commit()
+                            continue
+                        logger.info(f"Backfill stats avanzadas: replay {rid}")
+                        if not compute_and_persist_advanced(db, r):
+                            for p in r.players:   # intentada (fallo) → no reintentar
+                                p.advanced_computed = True
+                            db.commit()
+                        break   # solo una extracción real por iteración (ritmo suave)
                 finally:
                     db.close()
         except Exception as e:
@@ -189,6 +207,16 @@ async def lifespan(app: FastAPI):
 
     # Crear tablas si no existen
     init_db()
+
+    # Limpiar partidas no válidas (corruptas/no-partidas) que ya estuvieran en la BD
+    from routers.replays import delete_invalid_replays
+    db = SessionLocal()
+    try:
+        removed = delete_invalid_replays(db)
+        if removed:
+            logger.info(f"Limpieza: {removed} partidas no válidas eliminadas de la BD")
+    finally:
+        db.close()
 
     # Escanear replays ya existentes que no estén en la BD
     db = SessionLocal()

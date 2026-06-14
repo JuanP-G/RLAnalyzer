@@ -27,6 +27,7 @@ class SettingsUpdate(BaseModel):
     player_name: Optional[str] = None
     replays_folder: Optional[str] = None
     advanced_background: Optional[bool] = None
+    notify_corrupt: Optional[bool] = None
 
 
 def _known_players() -> list[str]:
@@ -53,6 +54,7 @@ def _effective() -> dict:
         "replays_folder": folder,
         "folder_exists":  bool(folder) and os.path.exists(folder),
         "advanced_background": settings_store.get_advanced_background(),
+        "notify_corrupt":     settings_store.get_notify_corrupt(),
         # read-only (solo arranque)
         "backend_port":   config.BACKEND_PORT,
         "db_path":        config.DB_PATH,
@@ -144,6 +146,10 @@ def update_settings(payload: SettingsUpdate):
     if payload.advanced_background is not None:
         settings_store.set(settings_store.KEY_ADVANCED_BG, "true" if payload.advanced_background else "false")
         changed["advanced_background"] = payload.advanced_background
+
+    if payload.notify_corrupt is not None:
+        settings_store.set(settings_store.KEY_NOTIFY_CORRUPT, "true" if payload.notify_corrupt else "false")
+        changed["notify_corrupt"] = payload.notify_corrupt
 
     result = _effective()
     result["changed"] = changed
