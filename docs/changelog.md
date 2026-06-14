@@ -31,7 +31,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 - **Backfill robusto**: las partidas que no se pueden calcular (sin `.replay` local o error) se marcan
   como intentadas → el progreso llega al 100% y el bucle deja de reintentarlas.
 - **Detalle UI**: el icono del modal de Ajustes ahora coincide con la rueda dentada del sidebar.
-  - Tests de validación/limpieza/rechazos, del feed de notificaciones y de los toggles. **113 tests** en total.
+
+### Revisión
+- **Eje de campo en una sola fuente de verdad**: `attack_sign` (campo rival) deriva de
+  `field_constants.own_goal_y`, de modo que validar/corregir la orientación del eje es un cambio de
+  **1 línea** y `avg_dist_to_goal` / `time_offensive_half_pct` no pueden desincronizarse.
+- **Notificaciones sin recargar**: el filtrado por toggles pasa al **backend** (`/api/notifications`
+  lee los `notify_*` frescos en cada llamada); desactivar un tipo surte efecto en el siguiente sondeo.
+- **Mapeo idx→PlayerStat más seguro**: el fallback por orden solo se aplica a coches anónimos (`Car_N`)
+  o cuando queda un único candidato; dos compañeros con nombre no emparejado quedan en NULL antes que
+  arriesgar un intercambio de valores.
+  - Tests de validación/limpieza/rechazos, del feed de notificaciones, del mapeo (anti-swap) y de los
+    toggles. **116 tests** en total.
 
 > Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
 

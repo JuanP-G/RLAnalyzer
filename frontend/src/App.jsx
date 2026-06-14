@@ -24,12 +24,12 @@ export default function App() {
     api.status().then(setStatus).catch(() => setStatus(null))
   }, [])
 
-  // Notificaciones del sistema sobre el procesado de replays (cada tipo pausable en Ajustes).
+  // Notificaciones del sistema sobre el procesado de replays. El backend filtra por los
+  // toggles de Ajustes (frescos en cada sondeo) y manda title/body listos para mostrar, así
+  // que aquí solo hay que mostrar lo que llegue → activar/desactivar surte efecto sin recargar.
   useEffect(() => {
     let seq = 0
     let timer = null
-    // Toggle por tipo de aviso; el backend ya manda title/body localizados.
-    const enabled = { corrupt: true, match_added: true, parse_error: true }
 
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {})
@@ -39,7 +39,7 @@ export default function App() {
       try {
         const data = await api.notifications(seq)
         for (const ev of data.events || []) {
-          if (enabled[ev.type] !== false && typeof Notification !== 'undefined') {
+          if (typeof Notification !== 'undefined') {
             try {
               new Notification(ev.title, { body: ev.body })
             } catch { /* permiso denegado / no soportado */ }
@@ -49,14 +49,7 @@ export default function App() {
       } catch { /* backend caído: reintentar luego */ }
     }
 
-    // Baseline: no notificar la cola previa; leer los flags y arrancar el sondeo
-    api.getSettings()
-      .then(s => {
-        enabled.corrupt     = s.notify_corrupt     !== false
-        enabled.match_added = s.notify_match_added !== false
-        enabled.parse_error = s.notify_parse_error !== false
-      })
-      .catch(() => {})
+    // Baseline: no notificar la cola previa; arrancar el sondeo desde el último seq
     api.notifications(0)
       .then(d => { seq = d.last_seq || 0 })
       .catch(() => {})

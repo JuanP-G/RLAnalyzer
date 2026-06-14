@@ -120,10 +120,18 @@ def get_rejected(since: int = 0):
 @router.get("/notifications")
 def get_notifications(since: int = 0):
     """Feed de avisos para la UI (partidas añadidas, corruptas no añadidas, errores de
-    procesado). Cada evento trae `type`, `title` y `body`; el frontend decide si lo muestra
-    según los toggles de Ajustes. `since` evita re-notificar lo ya visto."""
-    import events
-    return {"events": events.recent(since), "last_seq": events.last_seq()}
+    procesado). Cada evento trae `type`, `title` y `body` listos para mostrar. El filtrado
+    por toggles se hace AQUÍ (se leen frescos de Ajustes en cada llamada) para que activar/
+    desactivar un tipo surta efecto en el siguiente sondeo, sin recargar la app. `last_seq`
+    es siempre el global, así que el cliente no re-notifica lo ya visto ni revive lo filtrado."""
+    import events, settings_store
+    enabled = {
+        events.MATCH_ADDED: settings_store.get_notify_match_added(),
+        events.CORRUPT:     settings_store.get_notify_corrupt(),
+        events.PARSE_ERROR: settings_store.get_notify_parse_error(),
+    }
+    evs = [e for e in events.recent(since) if enabled.get(e["type"], True)]
+    return {"events": evs, "last_seq": events.last_seq()}
 
 
 class FavoritePayload(BaseModel):
@@ -334,8 +342,13 @@ def _set_adv(ps, a):
 
 def _assign_advanced_to_stats(stats, adv):
     """Asigna los resultados (por idx de frames) a los PlayerStat correctos:
-    primero por (nombre, equipo) exacto; luego por orden dentro del equipo para los
-    Car_N / no emparejados. Marca todos como calculados (aunque algún idx no cuadre)."""
+    1) por (nombre, equipo) exacto;
+    2) para los no emparejados, fallback por orden dentro del equipo SOLO si es seguro:
+       entradas anónimas (Car_N, sin nombre real que cruzar) o cuando queda un único
+       candidato en el equipo. Si una entrada con nombre real no casó y aún quedan ≥2
+       candidatos en su equipo, es ambigua → se deja NULL antes que arriesgar un
+       intercambio entre compañeros.
+    Marca todos como calculados (aunque algún idx quede sin valores)."""
     advp = adv.get("players", {})
     by_nt = {}
     for ps in stats:
@@ -358,9 +371,16 @@ def _assign_advanced_to_stats(stats, adv):
     for ps in stats:
         if id(ps) not in used:
             rem_by_team.setdefault(ps.team, []).append(ps)
-    for a in leftover:
+    # Asignar primero las anónimas (Car_N): no hay nombre que cruzar, el orden es lo único
+    # que tenemos. Después las que tienen nombre real, ya solo si el candidato es único.
+    for a in sorted(leftover, key=lambda x: 0 if (not (x.get("name") or "")
+                    or str(x.get("name")).startswith("Car_")) else 1):
         lst = rem_by_team.get(a.get("team"))
-        if lst:
+        if not lst:
+            continue
+        nm = a.get("name") or ""
+        anon = (not nm) or nm.startswith("Car_")
+        if anon or len(lst) == 1:
             _set_adv(lst.pop(0), a)
 
     for ps in stats:

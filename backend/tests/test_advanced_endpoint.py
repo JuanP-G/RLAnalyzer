@@ -66,6 +66,60 @@ def test_advanced_404(client):
     assert client.get("/api/replays/99999/advanced").status_code == 404
 
 
+class _FakePS:
+    def __init__(self, name, team):
+        self.player_name, self.team = name, team
+        self.possession_pct = self.avg_dist_to_goal = None
+        self.avg_dist_to_teammate = self.time_offensive_half_pct = None
+        self.advanced_computed = False
+
+
+@pytest.mark.unit
+def test_assign_unambiguous_by_elimination():
+    """Un nombre casa exacto; el otro no casa pero es el único candidato del equipo →
+    se asigna por eliminación (es correcto, no hay ambigüedad)."""
+    from routers.replays import _assign_advanced_to_stats
+    stats = [_FakePS("Alpha", 0), _FakePS("Beta", 0)]
+    adv = {"players": {
+        0: {"name": "Alpha", "team": 0, "possession_pct": 10.0},
+        1: {"name": "GhostName", "team": 0, "possession_pct": 90.0},  # nombre distinto
+    }}
+    _assign_advanced_to_stats(stats, adv)
+    alpha = next(p for p in stats if p.player_name == "Alpha")
+    beta = next(p for p in stats if p.player_name == "Beta")
+    assert alpha.possession_pct == 10.0
+    assert beta.possession_pct == 90.0
+    assert all(p.advanced_computed for p in stats)
+
+
+@pytest.mark.unit
+def test_assign_ambiguous_leaves_null_no_swap():
+    """Dos compañeros y NINGUNO casa por nombre → ambiguo: se deja NULL antes que
+    arriesgar cruzar los valores entre compañeros."""
+    from routers.replays import _assign_advanced_to_stats
+    stats = [_FakePS("Alpha", 0), _FakePS("Beta", 0)]
+    adv = {"players": {
+        0: {"name": "Ghost1", "team": 0, "possession_pct": 10.0},
+        1: {"name": "Ghost2", "team": 0, "possession_pct": 90.0},
+    }}
+    _assign_advanced_to_stats(stats, adv)
+    assert all(p.possession_pct is None for p in stats)
+    assert all(p.advanced_computed for p in stats)   # marcados, no se reintentan
+
+
+@pytest.mark.unit
+def test_assign_anonymous_car_by_order():
+    """Coches anónimos (Car_N) sin nombre que cruzar → se asignan por orden."""
+    from routers.replays import _assign_advanced_to_stats
+    stats = [_FakePS("Alpha", 0), _FakePS("Beta", 0)]
+    adv = {"players": {
+        0: {"name": "Car_0", "team": 0, "possession_pct": 10.0},
+        1: {"name": "Car_1", "team": 0, "possession_pct": 90.0},
+    }}
+    _assign_advanced_to_stats(stats, adv)
+    assert {p.possession_pct for p in stats} == {10.0, 90.0}
+
+
 def test_advanced_status(client, db):
     r1 = make_replay(db)
     make_replay(db)

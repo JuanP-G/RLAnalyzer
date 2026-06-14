@@ -109,9 +109,11 @@ muestra una **notificación del sistema** (toggle `notify_corrupt` en Ajustes). 
 
 **Feed de notificaciones:** `events` mantiene una cola en memoria de avisos tipados — `match_added`
 (partida nueva añadida), `corrupt` (no añadida) y `parse_error` (replay ilegible). `save_replay_to_db`
-y `process_pending_loop` los publican; el frontend sondea `GET /api/notifications?since=<seq>` cada 30s
-y muestra solo los tipos activados en Ajustes (`notify_match_added` / `notify_corrupt` / `notify_parse_error`).
-`GET /api/replays/rejected` sigue existiendo como el subconjunto `corrupt` del mismo feed.
+y `process_pending_loop` los publican; el frontend sondea `GET /api/notifications?since=<seq>` cada 30s.
+El **filtrado por toggles se hace en el backend** (lee `notify_match_added` / `notify_corrupt` /
+`notify_parse_error` frescos en cada llamada), de modo que activar/desactivar un tipo en Ajustes surte
+efecto en el siguiente sondeo sin recargar; `last_seq` es siempre el global (el cliente no re-notifica
+lo visto ni revive lo filtrado). `GET /api/replays/rejected` sigue como el subconjunto `corrupt`.
 
 **Módulos:**
 

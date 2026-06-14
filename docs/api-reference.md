@@ -178,7 +178,7 @@ Replays rechazados recientemente (corruptos / no-partidas: sin mapa o < 2 jugado
 
 ### `GET /api/notifications`
 
-Feed de avisos del sistema para la UI: nuevas partidas añadidas, partidas corruptas no añadidas y errores al procesar un replay. Cada evento trae `type` (`match_added` | `corrupt` | `parse_error`), `title` y `body` ya listos para mostrar; el frontend decide si lo muestra según los toggles de Ajustes. Acepta `?since=<seq>` para traer solo los nuevos. Cola en memoria (no se persiste).
+Feed de avisos del sistema para la UI: nuevas partidas añadidas, partidas corruptas no añadidas y errores al procesar un replay. Cada evento trae `type` (`match_added` | `corrupt` | `parse_error`), `title` y `body` ya listos para mostrar. **Filtra por los toggles de Ajustes en el servidor** (lee `notify_*` frescos en cada llamada), así que activar/desactivar un tipo surte efecto en el siguiente sondeo sin recargar la app. Acepta `?since=<seq>` para traer solo los nuevos; `last_seq` es siempre el global. Cola en memoria (no se persiste).
 
 **Respuesta:** `{ "events": [ { "seq": 13, "type": "match_added", "title": "Nueva partida añadida", "body": "DFH Stadium · Victoria 3-1", "ts": 1718200000.0 } ], "last_seq": 13 }`
 
