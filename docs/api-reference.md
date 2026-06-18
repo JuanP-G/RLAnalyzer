@@ -168,6 +168,42 @@ Comprueba si rrrocket está instalado y si el primer replay de la BD tiene su ar
 
 ---
 
+### `GET /api/replays/rejected`
+
+Replays rechazados recientemente (corruptos / no-partidas: sin mapa o < 2 jugadores), para que la UI los notifique. Acepta `?since=<seq>` para traer solo los nuevos. Es el subconjunto `type == "corrupt"` del feed de `/api/notifications`.
+
+**Respuesta:** `{ "events": [ { "seq": 12, "type": "corrupt", "title": "Partida no añadida", "body": "...", "file_name": "X.replay", "ts": 1718200000.0 } ], "last_seq": 12 }`
+
+---
+
+### `GET /api/notifications`
+
+Feed de avisos del sistema para la UI: nuevas partidas añadidas, partidas corruptas no añadidas y errores al procesar un replay. Cada evento trae `type` (`match_added` | `corrupt` | `parse_error`), `title` y `body` ya listos para mostrar. **Filtra por los toggles de Ajustes en el servidor** (lee `notify_*` frescos en cada llamada), así que activar/desactivar un tipo surte efecto en el siguiente sondeo sin recargar la app. Acepta `?since=<seq>` para traer solo los nuevos; `last_seq` es siempre el global. Cola en memoria (no se persiste).
+
+**Respuesta:** `{ "events": [ { "seq": 13, "type": "match_added", "title": "Nueva partida añadida", "body": "DFH Stadium · Victoria 3-1", "ts": 1718200000.0 } ], "last_seq": 13 }`
+
+---
+
+### `GET /api/replays/{replay_id}/advanced`
+
+Stats avanzadas de posición/posesión. **Cálculo perezoso**: la 1ª vez extrae los frames (rrrocket), calcula y persiste; después sirve de BD.
+
+**Respuesta (calculado):**
+```json
+{
+  "computed": true,
+  "teams": { "0": { "possession_pct": 62.0 }, "1": { "possession_pct": 38.0 } },
+  "players": [
+    { "player_name": "GustoffotsuG", "team": 0, "is_me": true,
+      "possession_pct": 40.0, "avg_dist_to_goal": 38.5,
+      "avg_dist_to_teammate": 25.2, "time_offensive_half_pct": 55.0 }
+  ]
+}
+```
+Si no se puede: `{ "computed": false, "reason": "no_local_replay" | "compute_error" }`.
+
+---
+
 ## Stats
 
 ### `GET /api/stats/summary`
@@ -342,6 +378,16 @@ Descripción y origen de cada métrica disponible, más la definición de partid
 }
 ```
 
+> El glosario incluye el grupo **`positioning`** (`possession_pct`, `avg_dist_to_goal`, `avg_dist_to_teammate`, `time_offensive_half_pct`), cuyas medias en `/analysis` solo cubren partidas con stats avanzadas ya calculadas.
+
+---
+
+### `GET /api/stats/advanced/status`
+
+Progreso del cálculo de stats avanzadas (para el indicador de Ajustes → Rendimiento).
+
+**Respuesta:** `{ "total": 142, "computed": 60, "pending": 82 }`
+
 ---
 
 ## Jugadores
@@ -413,21 +459,29 @@ Devuelve los valores efectivos, los read-only (solo arranque) y los jugadores co
   "backend_port": 8000,
   "db_path": "C:\\...\\data\\rl_data.db",
   "timezone": "Europe/Madrid",
+  "advanced_background": true,
+  "notify_corrupt": true,
+  "notify_match_added": true,
+  "notify_parse_error": true,
   "known_players": ["GustoffotsuG", "ldz150", "..."]
 }
 ```
 
 ### `PUT /api/settings`
 
-Actualiza el jugador principal y/o la carpeta de replays. Ambos campos son opcionales.
+Actualiza el jugador principal, la carpeta de replays y/o el cálculo en segundo plano. Todos los campos son opcionales.
 
 **Body:**
 ```json
-{ "player_name": "OtroJugador", "replays_folder": "D:\\Replays" }
+{ "player_name": "OtroJugador", "replays_folder": "D:\\Replays", "advanced_background": false }
 ```
 
 - Cambiar `player_name` → re-etiqueta `is_me` en `player_stats` y **recalcula `my_team`/`result`** desde la perspectiva del nuevo jugador; invalida la caché de perfil.
 - Cambiar `replays_folder` → reinicia el watcher y re-escanea la nueva carpeta.
+- `advanced_background` (bool) → activa/pausa el cálculo de stats avanzadas en segundo plano.
+- `notify_corrupt` (bool) → activa/pausa la notificación de partidas corruptas no añadidas.
+- `notify_match_added` (bool) → activa/pausa la notificación de nuevas partidas añadidas.
+- `notify_parse_error` (bool) → activa/pausa la notificación de errores al procesar un replay.
 - **400** si `player_name` o `replays_folder` quedan vacíos.
 
 **Respuesta:** igual que `GET /api/settings` más `"changed": { ... }` con lo modificado.

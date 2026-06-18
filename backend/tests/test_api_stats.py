@@ -12,9 +12,11 @@ def test_glossary(client):
     g = client.get("/api/stats/glossary").json()
     assert g["abnormal"]["min_duration"] == 180
     assert g["abnormal"]["max_goal_diff"] == 5
-    assert len(g["metrics"]) == 17
+    assert len(g["metrics"]) == 21
     keys = {m["key"] for m in g["metrics"]}
     assert "shooting_pct" in keys and "avg_boost" in keys
+    assert "possession_pct" in keys                      # grupo positioning
+    assert any(m["group"] == "positioning" for m in g["metrics"])
 
 
 def test_analysis_roles(client, db):

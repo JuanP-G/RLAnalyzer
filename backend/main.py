@@ -50,8 +50,15 @@ watcher = ReplayWatcher()
 
 def save_replay_to_db(data: dict):
     """Guarda los datos parseados de un replay en la base de datos."""
+    import events
     db = SessionLocal()
     try:
+        # ── Partida no válida (corrupta / freeplay / menú) → no se añade, se notifica ──
+        if not events.is_valid_match(data):
+            logger.warning(f"Replay no válido (corrupto/no-partida), no se añade: {data.get('file_name')}")
+            events.add_rejected(data.get("file_name") or data.get("file_path"))
+            return
+
         # Evitar duplicados
         existing = db.query(Replay).filter(Replay.file_path == data["file_path"]).first()
         if existing:
@@ -109,6 +116,14 @@ def save_replay_to_db(data: dict):
         db.commit()
         logger.info(f"Replay guardado: {data['file_name']} — {data['result']}")
 
+        # Notificar la nueva partida (marcador desde la perspectiva del jugador)
+        t0, t1 = data.get("team0_score"), data.get("team1_score")
+        score = None
+        if t0 is not None and t1 is not None:
+            mine, other = (t0, t1) if data.get("my_team") == 0 else (t1, t0)
+            score = f"{mine}-{other}"
+        events.add_match_added(data.get("map_name"), data.get("result"), score)
+
     except Exception as e:
         db.rollback()
         logger.exception(f"Error guardando replay: {e}")
@@ -144,7 +159,53 @@ async def process_pending_loop():
                 mark_processed(file_path)
             else:
                 logger.warning(f"No se pudo parsear: {file_path}")
+                import events
+                events.add_parse_error(os.path.basename(file_path))
+                mark_processed(file_path)   # no reintentar en bucle un replay ilegible
         await asyncio.sleep(5)
+
+
+async def advanced_backfill_loop():
+    """Calcula en segundo plano las stats avanzadas (posición/posesión) de las partidas
+    que aún no las tienen — una cada ~12s para no saturar (rrrocket es pesado). Así el
+    agregado de Análisis se llena solo sin tener que abrir cada partida. Pausable desde Ajustes."""
+    import os as _os
+    import settings_store
+    from routers.replays import compute_and_persist_advanced
+
+    await asyncio.sleep(25)  # margen tras el arranque
+    while True:
+        try:
+            if settings_store.get_advanced_background():
+                db = SessionLocal()
+                try:
+                    pending_ids = [
+                        row[0] for row in db.query(PlayerStat.replay_id)
+                        .filter(PlayerStat.advanced_computed == False)
+                        .distinct().limit(100).all()
+                    ]
+                    for rid in pending_ids:
+                        r = db.get(Replay, rid)
+                        if not r:
+                            continue
+                        # Sin .replay local → no se puede calcular aquí; marcar intentada
+                        # para que el backfill no la reintente eternamente (llega al 100%).
+                        if not r.file_path or not _os.path.exists(r.file_path):
+                            for p in r.players:
+                                p.advanced_computed = True
+                            db.commit()
+                            continue
+                        logger.info(f"Backfill stats avanzadas: replay {rid}")
+                        if not compute_and_persist_advanced(db, r):
+                            for p in r.players:   # intentada (fallo) → no reintentar
+                                p.advanced_computed = True
+                            db.commit()
+                        break   # solo una extracción real por iteración (ritmo suave)
+                finally:
+                    db.close()
+        except Exception as e:
+            logger.warning(f"Backfill stats avanzadas: {e}")
+        await asyncio.sleep(12)
 
 
 @asynccontextmanager
@@ -157,6 +218,16 @@ async def lifespan(app: FastAPI):
 
     # Crear tablas si no existen
     init_db()
+
+    # Limpiar partidas no válidas (corruptas/no-partidas) que ya estuvieran en la BD
+    from routers.replays import delete_invalid_replays
+    db = SessionLocal()
+    try:
+        removed = delete_invalid_replays(db)
+        if removed:
+            logger.info(f"Limpieza: {removed} partidas no válidas eliminadas de la BD")
+    finally:
+        db.close()
 
     # Escanear replays ya existentes que no estén en la BD
     db = SessionLocal()
@@ -174,8 +245,9 @@ async def lifespan(app: FastAPI):
     # Arrancar el watcher de archivos
     watcher.start()
 
-    # Arrancar el bucle de procesado en background
+    # Arrancar los bucles de background: procesado de nuevos replays + backfill avanzadas
     task = asyncio.create_task(process_pending_loop())
+    task_adv = asyncio.create_task(advanced_backfill_loop())
 
     logger.info("Backend listo en http://localhost:8000")
     logger.info("Documentación API en http://localhost:8000/docs")
@@ -184,6 +256,7 @@ async def lifespan(app: FastAPI):
 
     # ── Shutdown ──────────────────────────────────────────────────────────
     task.cancel()
+    task_adv.cancel()
     watcher.stop()
     logger.info("Backend detenido.")
 

@@ -66,9 +66,10 @@
 - Speedlines visuales cuando un coche supera velocidad supersónica
 
 #### Estadísticas avanzadas de partida
-- Posesión de balón por equipo/jugador (% tiempo que el jugador es el más cercano al balón)
-- Distancia media del jugador a la portería propia (posicionamiento)
-- Número de demos recibidos (ahora solo se guardan demos infligidos)
+- ✅ Posesión de balón por equipo/jugador (% tiempo siendo el más cercano al balón) — **hecho (v0.5.0)**
+- ✅ Distancia media a portería propia + al compañero + % en campo rival (posicionamiento) — **hecho (v0.5.0)**
+- Pendiente: **demos** (quién demoliza a quién; `demos_inflicted`/`demos_received`) — Fase B
+- Pendiente: **bumpeos** (choques sin demo, heurístico) — Fase C
 
 #### Exportar replay como video/GIF
 - Capturar frames del canvas Three.js y codificar como video o GIF animado

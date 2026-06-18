@@ -68,6 +68,11 @@ def player_to_dict(p: PlayerStat) -> dict:
         "time_low_air":    p.time_low_air,
         "time_high_air":   p.time_high_air,
         "total_distance":  p.total_distance,
+        # Stats avanzadas (NULL hasta que se calculan vía /advanced)
+        "possession_pct":          p.possession_pct,
+        "avg_dist_to_goal":        p.avg_dist_to_goal,
+        "avg_dist_to_teammate":    p.avg_dist_to_teammate,
+        "time_offensive_half_pct": p.time_offensive_half_pct,
     }
 
 
@@ -102,6 +107,31 @@ def list_replays(
         "total": total,
         "replays": [replay_to_dict(r) for r in replays],
     }
+
+
+@router.get("/replays/rejected")
+def get_rejected(since: int = 0):
+    """Replays rechazados recientemente (corruptos/no-partidas), para notificarlos en la UI.
+    Declarado antes de /replays/{replay_id} para que no lo capture la ruta dinámica."""
+    import events
+    return {"events": events.recent_rejected(since), "last_seq": events.last_seq()}
+
+
+@router.get("/notifications")
+def get_notifications(since: int = 0):
+    """Feed de avisos para la UI (partidas añadidas, corruptas no añadidas, errores de
+    procesado). Cada evento trae `type`, `title` y `body` listos para mostrar. El filtrado
+    por toggles se hace AQUÍ (se leen frescos de Ajustes en cada llamada) para que activar/
+    desactivar un tipo surta efecto en el siguiente sondeo, sin recargar la app. `last_seq`
+    es siempre el global, así que el cliente no re-notifica lo ya visto ni revive lo filtrado."""
+    import events, settings_store
+    enabled = {
+        events.MATCH_ADDED: settings_store.get_notify_match_added(),
+        events.CORRUPT:     settings_store.get_notify_corrupt(),
+        events.PARSE_ERROR: settings_store.get_notify_parse_error(),
+    }
+    evs = [e for e in events.recent(since) if enabled.get(e["type"], True)]
+    return {"events": evs, "last_seq": events.last_seq()}
 
 
 class FavoritePayload(BaseModel):
@@ -299,6 +329,132 @@ def get_replay_frames(replay_id: int, db: Session = Depends(get_db)):
         tb = traceback.format_exc()
         logger.error(f"Error cargando frames replay {replay_id}:\n{tb}")
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n\n{tb}")
+
+
+# ── Stats avanzadas de posición/posesión (cálculo perezoso + persistencia) ────
+
+def _set_adv(ps, a):
+    ps.possession_pct          = a.get("possession_pct")
+    ps.avg_dist_to_goal        = a.get("avg_dist_to_goal")
+    ps.avg_dist_to_teammate    = a.get("avg_dist_to_teammate")
+    ps.time_offensive_half_pct = a.get("time_offensive_half_pct")
+
+
+def _assign_advanced_to_stats(stats, adv):
+    """Asigna los resultados (por idx de frames) a los PlayerStat correctos:
+    1) por (nombre, equipo) exacto;
+    2) para los no emparejados, fallback por orden dentro del equipo SOLO si es seguro:
+       entradas anónimas (Car_N, sin nombre real que cruzar) o cuando queda un único
+       candidato en el equipo. Si una entrada con nombre real no casó y aún quedan ≥2
+       candidatos en su equipo, es ambigua → se deja NULL antes que arriesgar un
+       intercambio entre compañeros.
+    Marca todos como calculados (aunque algún idx quede sin valores)."""
+    advp = adv.get("players", {})
+    by_nt = {}
+    for ps in stats:
+        by_nt.setdefault((str(ps.player_name).lower(), ps.team), []).append(ps)
+
+    used = set()
+    leftover = []
+    for idx, a in advp.items():
+        nm = a.get("name") or ""
+        if nm and not nm.startswith("Car_"):
+            lst = by_nt.get((nm.lower(), a.get("team")))
+            if lst:
+                ps = lst.pop(0)
+                _set_adv(ps, a)
+                used.add(id(ps))
+                continue
+        leftover.append(a)
+
+    rem_by_team = {}
+    for ps in stats:
+        if id(ps) not in used:
+            rem_by_team.setdefault(ps.team, []).append(ps)
+    # Asignar primero las anónimas (Car_N): no hay nombre que cruzar, el orden es lo único
+    # que tenemos. Después las que tienen nombre real, ya solo si el candidato es único.
+    for a in sorted(leftover, key=lambda x: 0 if (not (x.get("name") or "")
+                    or str(x.get("name")).startswith("Car_")) else 1):
+        lst = rem_by_team.get(a.get("team"))
+        if not lst:
+            continue
+        nm = a.get("name") or ""
+        anon = (not nm) or nm.startswith("Car_")
+        if anon or len(lst) == 1:
+            _set_adv(lst.pop(0), a)
+
+    for ps in stats:
+        ps.advanced_computed = True
+
+
+def _team_possession(stats):
+    out = {}
+    for team in (0, 1):
+        vals = [p.possession_pct for p in stats if p.team == team and p.possession_pct is not None]
+        out[team] = {"possession_pct": round(sum(vals), 1) if vals else None}
+    return out
+
+
+def compute_and_persist_advanced(db, replay) -> bool:
+    """Extrae frames (rrrocket) + calcula stats avanzadas + persiste en los PlayerStat.
+    Reutilizado por el endpoint perezoso y por el backfill en segundo plano (main.py).
+    Devuelve True si se calcularon."""
+    import os
+    if not replay.file_path or not os.path.exists(replay.file_path):
+        return False
+    try:
+        from replay_frames import get_frames_cached
+        from advanced_stats import compute_advanced
+        frames = get_frames_cached(replay.id, replay.file_path)
+        adv = compute_advanced(frames)
+    except Exception as e:
+        logger.error(f"Error calculando stats avanzadas replay {replay.id}: {e}")
+        return False
+    _assign_advanced_to_stats(replay.players, adv)
+    db.commit()
+    return True
+
+
+@router.get("/replays/{replay_id}/advanced")
+def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
+    """
+    Stats avanzadas de posición/posesión. Cálculo perezoso: la 1ª vez extrae los
+    frames (rrrocket) y persiste; después se sirve de la BD.
+    """
+    import os
+
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Replay no encontrado")
+
+    if any(p.advanced_computed for p in r.players):
+        return {"computed": True,
+                "players": [player_to_dict(p) for p in r.players],
+                "teams": _team_possession(r.players)}
+
+    if not r.file_path or not os.path.exists(r.file_path):
+        return {"computed": False, "reason": "no_local_replay"}
+
+    if not compute_and_persist_advanced(db, r):
+        return {"computed": False, "reason": "compute_error"}
+
+    return {"computed": True,
+            "players": [player_to_dict(p) for p in r.players],
+            "teams": _team_possession(r.players)}
+
+
+# ── Partidas no válidas (corruptas / no-partidas) ────────────────────────────
+
+def delete_invalid_replays(db) -> int:
+    """Borra las partidas que no son partidas reales (sin mapa o con < 2 jugadores).
+    Devuelve cuántas se eliminaron. Se ejecuta al arrancar para limpiar las que ya
+    estuvieran guardadas."""
+    invalid = [r for r in db.query(Replay).all() if not r.map_name or len(r.players) < 2]
+    for r in invalid:
+        db.delete(r)
+    if invalid:
+        db.commit()
+    return len(invalid)
 
 
 @router.get("/stats/summary")

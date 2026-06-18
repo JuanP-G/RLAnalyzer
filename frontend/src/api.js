@@ -51,6 +51,7 @@ export const api = {
   summary:        ()                     => fetchJSON(`${BASE}/stats/summary`),
   myStats:        ()                     => fetchJSON(`${BASE}/stats/me`),
   analysisFilters:()                     => fetchJSON(`${BASE}/stats/analysis/filters`),
+  advancedStatus: ()                     => fetchJSON(`${BASE}/stats/advanced/status`),
   glossary:       ()                     => fetchJSON(`${BASE}/stats/glossary`),
   analysis:       (filters = {})         => fetchJSON(`${BASE}/stats/analysis${_statsQuery(filters)}`),
   trend:          (filters = {})         => fetchJSON(`${BASE}/stats/trend${_statsQuery(filters)}`),
@@ -76,6 +77,9 @@ export const api = {
     return fetchJSON(`${BASE}/replays?${p}`)
   },
   replay:         (id)                   => fetchJSON(`${BASE}/replays/${id}`),
+  replayAdvanced: (id)                   => fetchJSON(`${BASE}/replays/${id}/advanced`),
+  rejectedReplays:(since = 0)            => fetchJSON(`${BASE}/replays/rejected?since=${since}`),
+  notifications:  (since = 0)            => fetchJSON(`${BASE}/notifications?since=${since}`),
   replayFrames:   (id)                   => fetchJSON(`${BASE}/replays/${id}/frames`),
   ballchasing:    (id)                   => fetchJSON(`${BASE}/replays/${id}/ballchasing`),
   setFavorite:    (id, value)            => fetch(`${BASE}/replays/${id}/favorite`, {

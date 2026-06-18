@@ -16,10 +16,11 @@ const C = {
 }
 
 const GROUPS = [
-  { id: 'offense',  label: 'Ofensiva' },
-  { id: 'defense',  label: 'Defensa' },
-  { id: 'boost',    label: 'Boost' },
-  { id: 'movement', label: 'Movimiento' },
+  { id: 'offense',     label: 'Ofensiva' },
+  { id: 'defense',     label: 'Defensa' },
+  { id: 'boost',       label: 'Boost' },
+  { id: 'movement',    label: 'Movimiento' },
+  { id: 'positioning', label: 'Posicionamiento' },
 ]
 
 const PERIODS = [

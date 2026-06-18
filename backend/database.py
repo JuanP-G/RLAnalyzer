@@ -68,6 +68,24 @@ def _migrate():
             conn.commit()
             _backfill_categories(conn, log)
 
+        # ── Stats avanzadas en player_stats (posición/posesión) ──────────────
+        pcols = [row[1] for row in conn.execute(text("PRAGMA table_info(player_stats)"))]
+        adv_cols = {
+            "possession_pct":          "FLOAT",
+            "avg_dist_to_goal":        "FLOAT",
+            "avg_dist_to_teammate":    "FLOAT",
+            "time_offensive_half_pct": "FLOAT",
+            "advanced_computed":       "BOOLEAN DEFAULT 0",
+        }
+        added = False
+        for name, ddl in adv_cols.items():
+            if name not in pcols:
+                conn.execute(text(f"ALTER TABLE player_stats ADD COLUMN {name} {ddl}"))
+                added = True
+        if added:
+            conn.commit()
+            log.info("Migración: columnas de stats avanzadas añadidas a player_stats")
+
 
 def _backfill_categories(conn, log):
     """Re-extrae playlist_id de cada .replay existente para rellenar game_category."""

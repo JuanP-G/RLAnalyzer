@@ -5,6 +5,49 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.5.0] — 2026-06-11
+
+### Añadido
+- **Estadísticas avanzadas de partida — posición y posesión** (Fase A del item del roadmap)
+  - **Posesión** por jugador/equipo (% de tiempo siendo el más cercano al balón)
+  - **Distancia media a portería propia**, **distancia al compañero** (sincronía/huecos) y **% en campo rival**
+  - Cálculo **perezoso**: se calcula la 1ª vez que abres una partida (extrae frames con rrrocket) y se
+    **persiste** en BD (columnas nuevas en `player_stats`); después es instantáneo
+  - Núcleo puro `backend/advanced_stats.py` + `field_constants.py`; endpoint `GET /api/replays/{id}/advanced`
+  - Panel **"Posición y posesión"** en el detalle de partida (se calcula al expandirlo)
+  - Grupo nuevo **"Posicionamiento"** en Análisis (medias sobre partidas ya calculadas)
+  - **Backfill en segundo plano**: un bucle calcula las stats avanzadas de las partidas pendientes sin
+    que tengas que abrirlas (ritmo suave, ~1 cada 12s). Pausable desde Ajustes → **Rendimiento**, con
+    barra de progreso ("X de Y calculadas"). Endpoint `GET /api/stats/advanced/status`.
+- **Partidas corruptas / no-partidas**: los replays que no parsean como partida real (sin mapa o
+  < 2 jugadores: corruptos, freeplay, menú) **ya no se guardan** en la BD; se **notifica** con un
+  aviso del sistema (toggle en Ajustes → Notificaciones) vía `GET /api/replays/rejected`. Al arrancar
+  se **eliminan** las que ya estuvieran guardadas (`delete_invalid_replays`).
+- **Apartado de Notificaciones** (Ajustes): feed de avisos del sistema con un toggle por tipo —
+  **nueva partida añadida** (mapa + resultado), **partida corrupta no añadida** y **error al procesar
+  un replay**. El backend publica un feed tipado en `GET /api/notifications` (cada evento trae
+  `type`/`title`/`body`); el frontend lo sondea y muestra solo los tipos activados. Flags nuevos
+  `notify_match_added` y `notify_parse_error` (por defecto activos).
+- **Backfill robusto**: las partidas que no se pueden calcular (sin `.replay` local o error) se marcan
+  como intentadas → el progreso llega al 100% y el bucle deja de reintentarlas.
+- **Detalle UI**: el icono del modal de Ajustes ahora coincide con la rueda dentada del sidebar.
+
+### Revisión
+- **Eje de campo en una sola fuente de verdad**: `attack_sign` (campo rival) deriva de
+  `field_constants.own_goal_y`, de modo que validar/corregir la orientación del eje es un cambio de
+  **1 línea** y `avg_dist_to_goal` / `time_offensive_half_pct` no pueden desincronizarse.
+- **Notificaciones sin recargar**: el filtrado por toggles pasa al **backend** (`/api/notifications`
+  lee los `notify_*` frescos en cada llamada); desactivar un tipo surte efecto en el siguiente sondeo.
+- **Mapeo idx→PlayerStat más seguro**: el fallback por orden solo se aplica a coches anónimos (`Car_N`)
+  o cuando queda un único candidato; dos compañeros con nombre no emparejado quedan en NULL antes que
+  arriesgar un intercambio de valores.
+  - Tests de validación/limpieza/rechazos, del feed de notificaciones, del mapeo (anti-swap) y de los
+    toggles. **116 tests** en total.
+
+> Pendiente (fases siguientes): **demos** (quién demoliza a quién) y **bumpeos** (heurístico).
+
+---
+
 ## [0.4.0] — 2026-06-04
 
 ### Añadido

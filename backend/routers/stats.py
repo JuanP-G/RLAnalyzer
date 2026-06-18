@@ -85,6 +85,15 @@ METRICS = [
      "desc": "Segundos en el aire a gran altura (juego aéreo).", "source": SRC_ADV},
     {"key": "total_distance",  "label": "Distancia recorrida", "group": "movement", "higher_better": True,  "unit": "",
      "desc": "Distancia total recorrida (unidades del juego).", "source": SRC_ADV},
+    # Posicionamiento (calculado de los frames; perezoso → solo en partidas ya abiertas)
+    {"key": "possession_pct",          "label": "Posesión",            "group": "positioning", "higher_better": True, "unit": "%",
+     "desc": "% de tiempo siendo el jugador más cercano al balón (¿controlas o solo das pelotazos?).", "source": SRC_ADV},
+    {"key": "avg_dist_to_goal",        "label": "Dist. a portería",    "group": "positioning", "higher_better": None, "unit": "m",
+     "desc": "Distancia media a tu propia portería (posicionamiento defensivo/ofensivo).", "source": SRC_ADV},
+    {"key": "avg_dist_to_teammate",    "label": "Dist. al compañero",  "group": "positioning", "higher_better": None, "unit": "m",
+     "desc": "Distancia media a tu compañero (sincronía vs huecos/amontonamiento).", "source": SRC_ADV},
+    {"key": "time_offensive_half_pct", "label": "T. en campo rival",   "group": "positioning", "higher_better": None, "unit": "%",
+     "desc": "% de tiempo en la mitad rival del campo (ocupación ofensiva).", "source": SRC_ADV},
 ]
 
 
@@ -490,3 +499,17 @@ def dashboard(
             "win_rate": round(recent_wins / recent_total * 100, 1) if recent_total else 0,
         },
     }
+
+
+@router.get("/stats/advanced/status")
+def advanced_status(db: Session = Depends(get_db)):
+    """Progreso del cálculo de stats avanzadas (para el indicador de Ajustes)."""
+    total = db.query(Replay).count()
+    done = (
+        db.query(Replay.id)
+        .join(PlayerStat, PlayerStat.replay_id == Replay.id)
+        .filter(PlayerStat.advanced_computed == True)
+        .distinct()
+        .count()
+    )
+    return {"total": total, "computed": done, "pending": max(0, total - done)}

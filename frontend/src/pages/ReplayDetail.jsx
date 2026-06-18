@@ -324,6 +324,126 @@ function ReplayFileButton({ icon, label, onClick, disabled, title }) {
   )
 }
 
+// ── Panel de posición y posesión (cálculo perezoso) ──────────────────────────
+function PositioningPanel({ replayId, teamSize }) {
+  const [open, setOpen]       = useState(false)
+  const [data, setData]       = useState(null)   // respuesta de /advanced
+  const [loading, setLoading] = useState(false)
+
+  const load = () => {
+    setLoading(true)
+    api.replayAdvanced(replayId)
+      .then(setData)
+      .catch(e => setData({ computed: false, reason: 'compute_error', detail: e.message }))
+      .finally(() => setLoading(false))
+  }
+
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && !data && !loading) load()   // calcula la 1ª vez que se expande
+  }
+
+  const TEAM_COLOR = { 0: '#00A8FF', 1: '#F4620F' }
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: '#071829', border: '1px solid #122A4D' }}>
+      <button onClick={toggle}
+        className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-bg-hover"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+        <span className="font-display font-semibold text-gray-300 text-xs uppercase tracking-widest">
+          Posición y posesión
+        </span>
+        <span className="text-rl-blue text-xs">{open ? '▾ ocultar' : '▸ ver'}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4" style={{ borderTop: '1px solid #0D2240' }}>
+          {loading && (
+            <p className="text-gray-500 text-sm py-4">Calculando… (la 1ª vez puede tardar unos segundos).</p>
+          )}
+
+          {!loading && data && data.computed === false && (
+            <div className="py-4">
+              <p className="text-gray-400 text-sm">
+                {data.reason === 'no_local_replay'
+                  ? 'El archivo .replay no está en este equipo, así que no se pueden calcular estas stats.'
+                  : 'No se pudieron calcular las stats avanzadas.'}
+              </p>
+              {data.reason !== 'no_local_replay' && (
+                <button onClick={load}
+                  className="mt-2 px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:text-white"
+                  style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>
+                  ↻ Reintentar
+                </button>
+              )}
+            </div>
+          )}
+
+          {!loading && data && data.computed && (() => {
+            const players = (data.players || []).filter(p => p.possession_pct != null || p.avg_dist_to_goal != null)
+            const teamPoss = data.teams || {}
+            return (
+              <div className="pt-3 space-y-4">
+                {/* Posesión por equipo */}
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-gray-500 font-display font-semibold mb-2">
+                    Posesión por equipo <span className="text-gray-600 normal-case">· % de tiempo siendo el más cercano al balón</span>
+                  </p>
+                  <div className="flex h-6 rounded-md overflow-hidden" style={{ border: '1px solid #122A4D' }}>
+                    {[0, 1].map(t => {
+                      const v = teamPoss[t]?.possession_pct ?? teamPoss[String(t)]?.possession_pct ?? 0
+                      return (
+                        <div key={t} className="flex items-center justify-center text-[11px] font-mono-num font-bold text-white"
+                             style={{ width: `${v}%`, background: TEAM_COLOR[t], minWidth: v > 0 ? 24 : 0 }}>
+                          {v > 8 ? `${v}%` : ''}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Tabla por jugador */}
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-gray-500 font-display font-semibold">
+                      <th className="text-left py-1">Jugador</th>
+                      <th className="text-right py-1">Posesión</th>
+                      <th className="text-right py-1">Dist. portería</th>
+                      {teamSize > 1 && <th className="text-right py-1">Dist. compañero</th>}
+                      <th className="text-right py-1">En ataque</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((p, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid #0D2240' }}>
+                        <td className="py-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style={{ background: TEAM_COLOR[p.team] }} />
+                          <span className={p.is_me ? 'text-rl-blue font-semibold' : 'text-gray-300'}>{p.player_name}</span>
+                        </td>
+                        <td className="text-right font-mono-num text-gray-200">{p.possession_pct != null ? `${p.possession_pct}%` : '—'}</td>
+                        <td className="text-right font-mono-num text-gray-300">{p.avg_dist_to_goal != null ? `${p.avg_dist_to_goal} m` : '—'}</td>
+                        {teamSize > 1 && <td className="text-right font-mono-num text-gray-300">{p.avg_dist_to_teammate != null ? `${p.avg_dist_to_teammate} m` : '—'}</td>}
+                        <td className="text-right font-mono-num text-gray-300">{p.time_offensive_half_pct != null ? `${p.time_offensive_half_pct}%` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  <b className="text-gray-400">Cómo leerlo:</b> más <b>posesión</b> = controlas más el balón (no solo pelotazos).
+                  La <b>distancia al compañero</b> baja = vais muy juntos (huecos en el campo); muy alta = quizá demasiado separados.
+                  <b> En ataque</b> alto = pasas mucho tiempo en campo rival.
+                </p>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function ReplayDetail() {
   const { id }     = useParams()
@@ -568,6 +688,9 @@ export default function ReplayDetail() {
       </div>
       <div className="animate-fade-up" style={{ animationDelay: '0.3s' }}>
         <StatsComparison me={meData} myStats={myStats} />
+      </div>
+      <div className="animate-fade-up" style={{ animationDelay: '0.35s' }}>
+        <PositioningPanel replayId={id} teamSize={replay.team_size} />
       </div>
     </div>
     </div>
