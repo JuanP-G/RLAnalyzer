@@ -15,7 +15,7 @@ const AUMID = 'com.rlanalyzer.app'
 function registerAumidForToasts() {
   if (process.platform !== 'win32') return
   const key = `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`
-  const iconPath = path.join(__dirname, 'icon.png')
+  const iconPath = path.join(__dirname, 'icon.ico')   // mismo icono que el toast
   try {
     execFileSync('reg', ['add', key, '/v', 'DisplayName', '/t', 'REG_SZ', '/d', 'RLAnalyzer', '/f'], { windowsHide: true })
     execFileSync('reg', ['add', key, '/v', 'IconUri', '/t', 'REG_SZ', '/d', iconPath, '/f'], { windowsHide: true })

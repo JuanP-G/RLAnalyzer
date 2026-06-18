@@ -47,6 +47,19 @@ def test_event_types():
         assert e["title"] and e["body"]
 
 
+def test_notifications_filtered_by_toggle(client):
+    """El corazón del arreglo: /notifications filtra por los toggles de Ajustes (leídos
+    frescos en cada llamada), pero last_seq avanza igual (no se re-notifica ni reviven)."""
+    client.put("/api/settings", json={"notify_match_added": False})   # desactivar solo este tipo
+    events.add_match_added("DFH Stadium", "win", "3-1")               # debería quedar oculta
+    events.add_rejected("rota.replay")                                # notify_corrupt sigue activa
+    out = client.get("/api/notifications").json()
+    types = [e["type"] for e in out["events"]]
+    assert events.MATCH_ADDED not in types     # el toggle off la filtra
+    assert events.CORRUPT in types             # los demás tipos siguen llegando
+    assert out["last_seq"] == 2                 # el seq global avanza pese al filtrado
+
+
 def test_notifications_endpoint(client):
     events.add_match_added("Mannfield", "loss", "1-4")
     out = client.get("/api/notifications").json()
