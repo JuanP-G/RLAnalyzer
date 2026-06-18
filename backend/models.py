@@ -45,7 +45,12 @@ class PlayerStat(Base):
     assists          = Column(Integer, nullable=True)
     saves            = Column(Integer, nullable=True)
     shots            = Column(Integer, nullable=True)
+
+    # Demoliciones (módulo "demo" de subtr-actor). demos_computed distingue "aún no
+    # calculado" (None) de "0 demos" legítimo, igual que advanced_computed.
     demos_inflicted  = Column(Integer, nullable=True)
+    demos_taken      = Column(Integer, nullable=True)
+    demos_computed   = Column(Boolean, default=False)
 
     # Stats de boost (de subtr-actor stats module)
     boost_collected  = Column(Float, nullable=True)

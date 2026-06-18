@@ -98,6 +98,8 @@ def save_replay_to_db(data: dict):
                 saves            = p.get("saves"),
                 shots            = p.get("shots"),
                 demos_inflicted  = p.get("demos_inflicted"),
+                demos_taken      = p.get("demos_taken"),
+                demos_computed   = p.get("demos_computed", False),
                 boost_collected  = p.get("boost_collected"),
                 boost_stolen     = p.get("boost_stolen"),
                 boost_wasted     = p.get("boost_wasted"),
@@ -129,6 +131,41 @@ def save_replay_to_db(data: dict):
         logger.exception(f"Error guardando replay: {e}")
     finally:
         db.close()
+
+
+def compute_and_persist_demos(db, replay) -> bool:
+    """Extrae el módulo `demo` de subtr-actor para un replay y persiste demos_inflicted /
+    demos_taken en sus PlayerStat (emparejando por platform_id). Lo usa el backfill.
+    Devuelve True si se obtuvo el módulo demo."""
+    try:
+        import subtr_actor
+        from parser import _player_id_value, _safe_get
+    except Exception as e:
+        logger.warning(f"demos: subtr-actor no disponible ({e})")
+        return False
+    fn = getattr(subtr_actor, "get_summed_stats", None) or getattr(subtr_actor, "get_stats", None)
+    if not fn:
+        return False
+    try:
+        stats = fn(str(replay.file_path), module_names=["demo"])
+        demo_module = _safe_get(stats, "modules", "demo")
+    except Exception as e:
+        logger.warning(f"demos replay {replay.id}: {e}")
+        return False
+    if demo_module is None:
+        return False
+    by_pid = {}
+    for ps in _safe_get(demo_module, "player_stats") or []:
+        pid = _player_id_value(_safe_get(ps, "player_id"))
+        if pid:
+            by_pid[pid] = _safe_get(ps, "stats") or {}
+    for p in replay.players:
+        d = by_pid.get(p.platform_id) or {}
+        p.demos_inflicted = d.get("demos_inflicted")
+        p.demos_taken     = d.get("demos_taken")
+        p.demos_computed  = True   # intentada aunque no casara el id (no reintentar)
+    db.commit()
+    return True
 
 
 def restart_watcher_and_rescan():
@@ -165,15 +202,21 @@ async def process_pending_loop():
         await asyncio.sleep(5)
 
 
-async def advanced_backfill_loop():
-    """Calcula en segundo plano las stats avanzadas (posición/posesión) de las partidas
-    que aún no las tienen — una cada ~12s para no saturar (rrrocket es pesado). Así el
-    agregado de Análisis se llena solo sin tener que abrir cada partida. Pausable desde Ajustes."""
+async def _backfill_loop(label, flag_col, compute_fn, initial_delay=25):
+    """Bucle genérico de backfill en segundo plano: busca partidas cuyos PlayerStat tienen
+    `flag_col` en False y, si hay .replay local, las calcula con `compute_fn(db, replay)`
+    (una por iteración, ~12s, para no saturar). Las no calculables (sin archivo o error) se
+    marcan como intentadas para llegar al 100% y no reintentarlas. Pausable desde Ajustes."""
     import os as _os
     import settings_store
-    from routers.replays import compute_and_persist_advanced
 
-    await asyncio.sleep(25)  # margen tras el arranque
+    flag_attr = flag_col.key
+    def _mark_attempted(replay, db):
+        for p in replay.players:
+            setattr(p, flag_attr, True)
+        db.commit()
+
+    await asyncio.sleep(initial_delay)
     while True:
         try:
             if settings_store.get_advanced_background():
@@ -181,31 +224,37 @@ async def advanced_backfill_loop():
                 try:
                     pending_ids = [
                         row[0] for row in db.query(PlayerStat.replay_id)
-                        .filter(PlayerStat.advanced_computed == False)
-                        .distinct().limit(100).all()
+                        .filter(flag_col == False).distinct().limit(100).all()
                     ]
                     for rid in pending_ids:
                         r = db.get(Replay, rid)
                         if not r:
                             continue
-                        # Sin .replay local → no se puede calcular aquí; marcar intentada
-                        # para que el backfill no la reintente eternamente (llega al 100%).
                         if not r.file_path or not _os.path.exists(r.file_path):
-                            for p in r.players:
-                                p.advanced_computed = True
-                            db.commit()
+                            _mark_attempted(r, db)
                             continue
-                        logger.info(f"Backfill stats avanzadas: replay {rid}")
-                        if not compute_and_persist_advanced(db, r):
-                            for p in r.players:   # intentada (fallo) → no reintentar
-                                p.advanced_computed = True
-                            db.commit()
+                        logger.info(f"{label}: replay {rid}")
+                        if not compute_fn(db, r):
+                            _mark_attempted(r, db)
                         break   # solo una extracción real por iteración (ritmo suave)
                 finally:
                     db.close()
         except Exception as e:
-            logger.warning(f"Backfill stats avanzadas: {e}")
+            logger.warning(f"{label}: {e}")
         await asyncio.sleep(12)
+
+
+async def advanced_backfill_loop():
+    """Backfill de stats avanzadas (posición/posesión) — frames con rrrocket."""
+    from routers.replays import compute_and_persist_advanced
+    await _backfill_loop("Backfill stats avanzadas", PlayerStat.advanced_computed,
+                         compute_and_persist_advanced, initial_delay=25)
+
+
+async def demos_backfill_loop():
+    """Backfill de demoliciones (módulo demo de subtr-actor) en partidas ya guardadas."""
+    await _backfill_loop("Backfill demos", PlayerStat.demos_computed,
+                         compute_and_persist_demos, initial_delay=35)
 
 
 @asynccontextmanager
@@ -245,9 +294,10 @@ async def lifespan(app: FastAPI):
     # Arrancar el watcher de archivos
     watcher.start()
 
-    # Arrancar los bucles de background: procesado de nuevos replays + backfill avanzadas
+    # Arrancar los bucles de background: procesado de nuevos replays + backfills
     task = asyncio.create_task(process_pending_loop())
     task_adv = asyncio.create_task(advanced_backfill_loop())
+    task_demos = asyncio.create_task(demos_backfill_loop())
 
     logger.info("Backend listo en http://localhost:8000")
     logger.info("Documentación API en http://localhost:8000/docs")
@@ -257,6 +307,7 @@ async def lifespan(app: FastAPI):
     # ── Shutdown ──────────────────────────────────────────────────────────
     task.cancel()
     task_adv.cancel()
+    task_demos.cancel()
     watcher.stop()
     logger.info("Backend detenido.")
 

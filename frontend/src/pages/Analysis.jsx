@@ -18,9 +18,18 @@ const C = {
 const GROUPS = [
   { id: 'offense',     label: 'Ofensiva' },
   { id: 'defense',     label: 'Defensa' },
+  { id: 'shots',       label: 'Tiros/Puntería' },
+  { id: 'contact',     label: 'Contacto' },
   { id: 'boost',       label: 'Boost' },
   { id: 'movement',    label: 'Movimiento' },
   { id: 'positioning', label: 'Posicionamiento' },
+]
+
+// Sectores: agrupan las pestañas para visualizarlas mejor (las pestañas siguen siendo GROUPS).
+const SECTORS = [
+  { label: 'General',   groups: ['offense', 'defense'] },
+  { label: 'Ataque',    groups: ['shots', 'contact'] },
+  { label: 'Movilidad', groups: ['boost', 'movement', 'positioning'] },
 ]
 
 const PERIODS = [
@@ -477,16 +486,29 @@ function CompareView({ group, setGroup, groupMetrics, allMetrics }) {
 
   return (
     <>
-      {/* Pestañas de grupo */}
-      <div className="flex gap-1.5 flex-wrap">
-        {GROUPS.map(g => (
-          <button key={g.id} onClick={() => setGroup(g.id)}
-            className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
-            style={group === g.id
-              ? { background: 'rgba(0,168,255,0.15)', border: '1px solid rgba(0,168,255,0.35)', color: '#fff' }
-              : { background: '#071829', border: '1px solid #122A4D', color: '#6590BC' }}>
-            {g.label}
-          </button>
+      {/* Pestañas de grupo, agrupadas por sector */}
+      <div className="flex flex-wrap gap-x-5 gap-y-3">
+        {SECTORS.map(sec => (
+          <div key={sec.label} className="flex flex-col gap-1.5">
+            <span className="text-[10px] uppercase tracking-widest text-gray-600 font-display font-semibold pl-0.5">
+              {sec.label}
+            </span>
+            <div className="flex gap-1.5 flex-wrap">
+              {sec.groups.map(gid => {
+                const g = GROUPS.find(x => x.id === gid)
+                if (!g) return null
+                return (
+                  <button key={g.id} onClick={() => setGroup(g.id)}
+                    className="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all"
+                    style={group === g.id
+                      ? { background: 'rgba(0,168,255,0.15)', border: '1px solid rgba(0,168,255,0.35)', color: '#fff' }
+                      : { background: '#071829', border: '1px solid #122A4D', color: '#6590BC' }}>
+                    {g.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         ))}
       </div>
 

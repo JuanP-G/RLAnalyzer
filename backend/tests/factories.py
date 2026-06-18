@@ -109,8 +109,9 @@ def build_subtr_meta(*, me=ME, include_headers=True):
 
 def build_subtr_stats(*, tracked_time=120.0, speed_integral=180000.0,
                       amount_collected=2500.0, amount_stolen=100.0, amount_used=2100.0,
-                      boost_integral=45.0, pids=(EPIC_ME, EPIC_MATE, STEAM_OPP, EPIC_OPP2)):
-    """Respuesta de subtr_actor.get_stats(path, module_names=[...])."""
+                      boost_integral=45.0, pids=(EPIC_ME, EPIC_MATE, STEAM_OPP, EPIC_OPP2),
+                      include_demo=True):
+    """Respuesta de subtr_actor.get_stats/get_summed_stats(path, module_names=[...])."""
     def boost(pid):
         return {"player_id": {"id": pid},
                 "stats": {"amount_collected": amount_collected, "amount_stolen": amount_stolen,
@@ -121,10 +122,18 @@ def build_subtr_stats(*, tracked_time=120.0, speed_integral=180000.0,
                           "time_supersonic_speed": 30.0, "time_boost_speed": 80.0,
                           "time_slow_speed": 40.0, "time_on_ground": 200.0,
                           "time_low_air": 50.0, "time_high_air": 10.0, "total_distance": 100000.0}}
-    return {"modules": {
+    # demos por jugador (índice → inflicted/taken)
+    _demos = [(2, 1), (0, 0), (1, 1), (0, 2)]
+    def demo(i, pid):
+        inf, tak = _demos[i % len(_demos)]
+        return {"player_id": {"id": pid}, "stats": {"demos_inflicted": inf, "demos_taken": tak}}
+    modules = {
         "boost":    {"player_stats": [boost(p) for p in pids]},
         "movement": {"player_stats": [move(p) for p in pids]},
-    }}
+    }
+    if include_demo:
+        modules["demo"] = {"player_stats": [demo(i, p) for i, p in enumerate(pids)]}
+    return {"modules": modules}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

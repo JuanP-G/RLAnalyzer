@@ -76,6 +76,8 @@ def _migrate():
             "avg_dist_to_teammate":    "FLOAT",
             "time_offensive_half_pct": "FLOAT",
             "advanced_computed":       "BOOLEAN DEFAULT 0",
+            "demos_taken":             "INTEGER",
+            "demos_computed":          "BOOLEAN DEFAULT 0",
         }
         added = False
         for name, ddl in adv_cols.items():

@@ -68,8 +68,12 @@
 #### Estadísticas avanzadas de partida
 - ✅ Posesión de balón por equipo/jugador (% tiempo siendo el más cercano al balón) — **hecho (v0.5.0)**
 - ✅ Distancia media a portería propia + al compañero + % en campo rival (posicionamiento) — **hecho (v0.5.0)**
-- Pendiente: **demos** (quién demoliza a quién; `demos_inflicted`/`demos_received`) — Fase B
-- Pendiente: **bumpeos** (choques sin demo, heurístico) — Fase C
+- ✅ **Demos** — conteos `demos_inflicted`/`demos_taken` por jugador (módulo `demo` de subtr-actor),
+  grupo "Contacto" en Análisis — **hecho (v0.6.0)**. Pendiente: mapa pareado quién→quién (datos ya
+  disponibles en `demolitions`).
+- Pendiente: **bumpeos** (choques sin demo) — datos ya disponibles (módulo `bump` con eventos
+  initiator→victim) — Fase C
+- Pendiente: **mapa de tiros** (portería + dónde fueron los disparos) — viz espacial desde frames
 
 #### Exportar replay como video/GIF
 - Capturar frames del canvas Three.js y codificar como video o GIF animado
