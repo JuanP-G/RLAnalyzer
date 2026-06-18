@@ -1,10 +1,29 @@
 const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog, Notification } = require('electron')
 const fs = require('fs')
-const { spawn }                      = require('child_process')
+const { spawn, execFileSync }        = require('child_process')
 const path                           = require('path')
 const http                           = require('http')
 
 const ROOT = path.join(__dirname, '..')
+
+// Identidad de la app (debe coincidir entre setAppUserModelId, el registro y el shortcut).
+const AUMID = 'com.rlanalyzer.app'
+
+// Registra el AppUserModelId en el registro de Windows para que el sistema acepte los toasts
+// y RLAnalyzer aparezca en Configuración ▸ Notificaciones. Sin esto, Notification.show() falla
+// con HRESULT 0x803E0114 (app no registrada). Idempotente: se ejecuta en cada arranque.
+function registerAumidForToasts() {
+  if (process.platform !== 'win32') return
+  const key = `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`
+  const iconPath = path.join(__dirname, 'icon.png')
+  try {
+    execFileSync('reg', ['add', key, '/v', 'DisplayName', '/t', 'REG_SZ', '/d', 'RLAnalyzer', '/f'], { windowsHide: true })
+    execFileSync('reg', ['add', key, '/v', 'IconUri', '/t', 'REG_SZ', '/d', iconPath, '/f'], { windowsHide: true })
+    console.log('[notify] AppUserModelId registrado:', AUMID)
+  } catch (err) {
+    console.error('[notify] no se pudo registrar el AppUserModelId:', err.message)
+  }
+}
 
 // Puertos centralizados (un único sitio; overridables por entorno).
 // Deben coincidir con backend/config.py (BACKEND_PORT) y frontend/vite.config.js.
@@ -351,8 +370,10 @@ ipcMain.handle('bcview:close', () => {
 Menu.setApplicationMenu(null)   // Elimina la barra de menú nativa (File/Edit/…)
 
 // Identidad de la app para Windows: imprescindible para que los toasts de notificación
-// se muestren (sin esto, Windows los descarta sin avisar). Inofensivo en otras plataformas.
-app.setAppUserModelId('com.rlanalyzer.app')
+// se muestren. Hay que registrarla en el registro (registerAumidForToasts) y fijarla con
+// setAppUserModelId; ambas con el MISMO id. Inofensivo en otras plataformas.
+registerAumidForToasts()
+app.setAppUserModelId(AUMID)
 
 app.whenReady().then(createWindow)
 
