@@ -30,21 +30,28 @@ export default function App() {
   useEffect(() => {
     let seq = 0
     let timer = null
+    let cancelled = false   // evita un 2º intervalo fugado (StrictMode monta el efecto 2 veces)
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    // En la app de escritorio se usa el toast NATIVO (proceso principal de Electron): en
+    // Windows el new Notification() del renderer se descarta si la app no tiene identidad.
+    // En el navegador se cae al Web Notifications API (pidiendo permiso si hace falta).
+    const electronNotify = window.electronAPI?.notify
+    if (!electronNotify && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {})
+    }
+
+    const show = (title, body) => {
+      if (electronNotify) {
+        electronNotify(title, body)
+      } else if (typeof Notification !== 'undefined') {
+        try { new Notification(title, { body }) } catch { /* permiso denegado / no soportado */ }
+      }
     }
 
     const poll = async () => {
       try {
         const data = await api.notifications(seq)
-        for (const ev of data.events || []) {
-          if (typeof Notification !== 'undefined') {
-            try {
-              new Notification(ev.title, { body: ev.body })
-            } catch { /* permiso denegado / no soportado */ }
-          }
-        }
+        for (const ev of data.events || []) show(ev.title, ev.body)
         if (data.last_seq != null) seq = data.last_seq
       } catch { /* backend caído: reintentar luego */ }
     }
@@ -53,9 +60,9 @@ export default function App() {
     api.notifications(0)
       .then(d => { seq = d.last_seq || 0 })
       .catch(() => {})
-      .finally(() => { timer = setInterval(poll, 30000) })
+      .finally(() => { if (!cancelled) timer = setInterval(poll, 30000) })
 
-    return () => { if (timer) clearInterval(timer) }
+    return () => { cancelled = true; if (timer) clearInterval(timer) }
   }, [])
 
   return (

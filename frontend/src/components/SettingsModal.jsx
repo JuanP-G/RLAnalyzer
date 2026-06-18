@@ -57,6 +57,25 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
+  // Dispara un toast de prueba y muestra el resultado REAL devuelto por el sistema.
+  const testNotify = async () => {
+    if (window.electronAPI?.notify) {
+      const res = await window.electronAPI.notify('RLAnalyzer', 'Notificación de prueba ✓')
+      if (res?.ok) {
+        setMsg({ type: 'ok', text: 'Sistema: enviada. Si no la ves → Ajustes de Windows ▸ Notificaciones (activa RLAnalyzer y desactiva Concentración).' })
+      } else {
+        setMsg({ type: 'err', text: `El sistema la rechazó: ${res?.reason || res?.error || 'motivo desconocido'}` })
+      }
+    } else if (typeof Notification !== 'undefined') {
+      const fire = () => { try { new Notification('RLAnalyzer', { body: 'Notificación de prueba ✓' }) } catch {} }
+      if (Notification.permission === 'granted') fire()
+      else Notification.requestPermission().then(p => { if (p === 'granted') fire() })
+      setMsg({ type: 'ok', text: 'Notificación enviada (navegador).' })
+    } else {
+      setMsg({ type: 'err', text: 'Este entorno no soporta notificaciones.' })
+    }
+  }
+
   // Cerrar con Esc
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -244,6 +263,11 @@ export default function SettingsModal({ onClose, onSaved }) {
                   Las repeticiones sin datos (corruptas, freeplay o de menú) no se guardan en la base de datos.
                   Los errores son replays que no se pudieron leer.
                 </p>
+                <button onClick={testNotify}
+                  className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white transition-all"
+                  style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>
+                  Probar notificación
+                </button>
               </Section>
 
               <Section title="Avanzado" desc="Estos valores solo cambian editando la configuración y reiniciando el backend.">

@@ -123,7 +123,7 @@ lo visto ni revive lo filtrado). `GET /api/replays/rejected` sigue como el subco
 | `config.py` | `PLAYER_NAME`, `REPLAYS_FOLDER`, `DB_PATH`, `BACKEND_PORT` |
 | `models.py` | SQLAlchemy models: `Replay`, `PlayerStat`, `Setting` |
 | `database.py` | Engine SQLite, `SessionLocal`, `get_db`, `_migrate()` (ALTER TABLE) |
-| `parser.py` | Parseo de `.replay` con subtr-actor-py |
+| `parser.py` | Parseo de `.replay` con subtr-actor-py (opcional) + fallback a la cabecera de rrrocket |
 | `watcher.py` | `ReplayWatcher` (watchdog), cola de pendientes |
 | `replay_frames.py` | Extracción de frames 3D con rrrocket (`_parse_rrrocket`, `get_frames_cached`) |
 | `advanced_stats.py` | `compute_advanced(frames)` — posesión y posicionamiento (puro) |
@@ -212,6 +212,14 @@ Un registro por jugador por partida. Campos: `player_name`, `platform_id`, `team
 - Metadata: mapa, modo, tamaño de equipos, fecha, duración
 - Stats de jugadores: goles, asistencias, paradas, tiros, boost, velocidades
 - Resultado: determinado comparando qué equipo tiene más goles y en qué equipo está `PLAYER_NAME`
+
+**`subtr-actor` es opcional y resiliente.** La función de stats es `get_summed_stats` (subtr-actor ≥1.0;
+antes `get_stats` — el parser usa la que exista). Si `subtr-actor` no está instalado o no puede decodificar
+el replay (p. ej. un atributo nuevo de Rocket League como `AnonymizedName` rompe el parseo de frames),
+`parser.py` reconstruye lo esencial desde la **cabecera de rrrocket** (`tools/rrrocket.exe` sin `-n`, que no
+toca los frames de red): mapa, equipos, marcador y box-score por jugador. Las stats detalladas
+(boost/movimiento) y la categoría/playlist quedan en `None` en ese modo degradado. Así una partida real
+nunca se pierde por un parser desactualizado; solo se descarta lo que ni a nivel de cabecera es una partida.
 
 ### Fase 2 — Network frames para el visor 3D (rrrocket)
 

@@ -1,4 +1,6 @@
 """Tests de parser.py (subtr_actor mockeado, sin binario nativo ni BD real)."""
+import json
+
 import pytest
 
 from tests.factories import (
@@ -122,14 +124,94 @@ def test_tracked_time_zero_means_avg_speed_none(fake_subtr, fake_replay_file):
     assert me["avg_speed"] is None
 
 
-def test_parse_replay_native_raises_still_returns_dict(fake_subtr, fake_replay_file):
+def test_parse_replay_native_raises_still_returns_dict(fake_subtr, fake_replay_file, monkeypatch):
     parser, fake = fake_subtr
     fake.parse_replay_ret = RuntimeError("nativo roto")
     fake.replay_meta_ret = build_subtr_meta()
     fake.get_stats_ret = build_subtr_stats()
+    # Evitar que el fallback de cabecera invoque el binario real en este test
+    monkeypatch.setattr(parser, "_build_from_header", lambda path: None)
     out = parser.parse_replay(fake_replay_file)
     assert out is not None            # no devuelve None: props quedan vacíos
     assert out["map_name"] is None
+
+
+def _fake_header(team0=2, team1=3):
+    return {"properties": {
+        "MapName": "cs_p", "MatchType": "Online", "TeamSize": 2,
+        "Date": "2026-06-18 13-45-10", "NumFrames": 11359, "RecordFPS": 30.0,
+        "Team0Score": team0, "Team1Score": team1,
+        "PlayerStats": [
+            {"Name": ME, "Team": 0, "Score": 563, "Goals": 2, "Assists": 0, "Saves": 1,
+             "Shots": 7, "PlayerID": {"fields": {"EpicAccountId": "epic-me"}}, "OnlineID": "0"},
+            {"Name": "Mate", "Team": 0, "Score": 300, "Goals": 0, "Assists": 1, "Saves": 2,
+             "Shots": 3, "PlayerID": {"fields": {"EpicAccountId": "epic-mate"}}, "OnlineID": "0"},
+            {"Name": "Opp1", "Team": 1, "Score": 648, "Goals": 1, "Assists": 1, "Saves": 4,
+             "Shots": 2, "PlayerID": {"fields": {"EpicAccountId": "0"}}, "OnlineID": "steam-1"},
+            {"Name": "Opp2", "Team": 1, "Score": 671, "Goals": 2, "Assists": 1, "Saves": 3,
+             "Shots": 6, "PlayerID": {"fields": {"EpicAccountId": "epic-opp2"}}, "OnlineID": "0"},
+        ],
+    }}
+
+
+def test_fallback_to_rrrocket_header(fake_subtr, fake_replay_file, monkeypatch):
+    """Si subtr-actor no parsea (p. ej. atributo nuevo de RL), la partida se reconstruye
+    desde la cabecera de rrrocket: mapa + equipos + marcador + box-score; stats detalladas
+    en None y categoría None (la cabecera no trae playlist)."""
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = {}        # subtr no da nada
+    fake.replay_meta_ret = {}
+    fake.get_stats_ret = {}
+
+    class _Res:
+        returncode = 0
+        stdout = json.dumps(_fake_header()).encode("utf-8")
+    monkeypatch.setattr(parser.subprocess, "run", lambda *a, **k: _Res())
+    monkeypatch.setattr("os.path.exists", lambda p: True)   # rrrocket.exe "existe"
+
+    data = parser.parse_replay(fake_replay_file)
+    assert data is not None
+    assert data["map_name"] == "cs_p"
+    assert data["team_size"] == 2
+    assert (data["team0_score"], data["team1_score"]) == (2, 3)
+    assert data["my_team"] == 0 and data["result"] == "loss"
+    assert data["game_category"] is None and data["playlist_id"] is None
+    assert len(data["players"]) == 4
+    me = next(p for p in data["players"] if p["is_me"])
+    assert me["goals"] == 2 and me["platform_id"] == "epic-me"
+    assert me["boost_collected"] is None and me["avg_speed"] is None   # detalle no disponible
+
+
+def test_uses_get_summed_stats_when_present(fake_subtr, fake_replay_file, monkeypatch):
+    """subtr-actor >=1.0 renombró get_stats → get_summed_stats. El parser usa la que exista."""
+    import sys
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = build_subtr_props()
+    fake.replay_meta_ret = build_subtr_meta()
+    fake.get_stats_ret = build_subtr_stats()
+    mod = sys.modules["subtr_actor"]
+    mod.get_summed_stats = fake.get_stats        # API nueva
+    monkeypatch.delattr(mod, "get_stats", raising=False)   # la antigua ya no está
+    me = next(p for p in parser.parse_replay(fake_replay_file)["players"] if p["is_me"])
+    assert me["avg_boost"] == 45.0 and me["boost_wasted"] == 2100.0   # leído vía get_summed_stats
+
+
+def test_fallback_header_not_a_match_returns_none(fake_subtr, fake_replay_file, monkeypatch):
+    """Si ni la cabecera tiene mapa o <2 jugadores, no se inventa nada (la ingesta lo rechaza)."""
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = {}
+    fake.replay_meta_ret = {}
+    fake.get_stats_ret = {}
+
+    class _Res:
+        returncode = 0
+        stdout = json.dumps({"properties": {"MapName": None, "PlayerStats": []}}).encode("utf-8")
+    monkeypatch.setattr(parser.subprocess, "run", lambda *a, **k: _Res())
+    monkeypatch.setattr("os.path.exists", lambda p: True)
+
+    data = parser.parse_replay(fake_replay_file)
+    # subtr vacío + cabecera no-partida → dict con map_name None (la ingesta lo descartará)
+    assert data["map_name"] is None and len(data["players"]) == 0
 
 
 def test_result_loss(fake_subtr, fake_replay_file):

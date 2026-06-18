@@ -1,10 +1,29 @@
-const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog, Notification } = require('electron')
 const fs = require('fs')
-const { spawn }                      = require('child_process')
+const { spawn, execFileSync }        = require('child_process')
 const path                           = require('path')
 const http                           = require('http')
 
 const ROOT = path.join(__dirname, '..')
+
+// Identidad de la app (debe coincidir entre setAppUserModelId, el registro y el shortcut).
+const AUMID = 'com.rlanalyzer.app'
+
+// Registra el AppUserModelId en el registro de Windows para que el sistema acepte los toasts
+// y RLAnalyzer aparezca en Configuración ▸ Notificaciones. Sin esto, Notification.show() falla
+// con HRESULT 0x803E0114 (app no registrada). Idempotente: se ejecuta en cada arranque.
+function registerAumidForToasts() {
+  if (process.platform !== 'win32') return
+  const key = `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`
+  const iconPath = path.join(__dirname, 'icon.ico')   // mismo icono que el toast
+  try {
+    execFileSync('reg', ['add', key, '/v', 'DisplayName', '/t', 'REG_SZ', '/d', 'RLAnalyzer', '/f'], { windowsHide: true })
+    execFileSync('reg', ['add', key, '/v', 'IconUri', '/t', 'REG_SZ', '/d', iconPath, '/f'], { windowsHide: true })
+    console.log('[notify] AppUserModelId registrado:', AUMID)
+  } catch (err) {
+    console.error('[notify] no se pudo registrar el AppUserModelId:', err.message)
+  }
+}
 
 // Puertos centralizados (un único sitio; overridables por entorno).
 // Deben coincidir con backend/config.py (BACKEND_PORT) y frontend/vite.config.js.
@@ -280,6 +299,28 @@ ipcMain.handle('dialog:selectFolder', async () => {
 
 ipcMain.handle('backend:restart', () => restartBackend())
 
+// ── IPC: notificaciones del sistema (toast nativo de Windows/macOS) ───────────
+// Se disparan desde el proceso PRINCIPAL (no con el new Notification() del renderer):
+// en Windows, los toasts del renderer se descartan en silencio si la app no tiene
+// AppUserModelId. Desde aquí, con setAppUserModelId fijado, sí aparecen.
+const NOTIFY_ICON = path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+ipcMain.handle('notify:show', (_event, { title, body } = {}) => {
+  const supported = Notification.isSupported()
+  console.log('[notify] isSupported=', supported, '| title=', title)
+  if (!supported) return { ok: false, reason: 'unsupported' }
+  try {
+    const n = new Notification({ title: title || 'RLAnalyzer', body: body || '', icon: NOTIFY_ICON, silent: false })
+    n.on('show',   ()            => console.log('[notify] mostrada'))
+    n.on('failed', (_e, err)     => console.error('[notify] failed:', err))
+    n.on('click',  ()            => mainWindow?.show())
+    n.show()
+    return { ok: true, supported }
+  } catch (err) {
+    console.error('[notify] error:', err)
+    return { ok: false, error: err.message }
+  }
+})
+
 // ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
 // Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de
 // render de Chromium que la ventana principal (WebGL/GPU real), de modo que el
@@ -327,6 +368,12 @@ ipcMain.handle('bcview:close', () => {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 Menu.setApplicationMenu(null)   // Elimina la barra de menú nativa (File/Edit/…)
+
+// Identidad de la app para Windows: imprescindible para que los toasts de notificación
+// se muestren. Hay que registrarla en el registro (registerAumidForToasts) y fijarla con
+// setAppUserModelId; ambas con el MISMO id. Inofensivo en otras plataformas.
+registerAumidForToasts()
+app.setAppUserModelId(AUMID)
 
 app.whenReady().then(createWindow)
 

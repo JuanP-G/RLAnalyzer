@@ -77,6 +77,18 @@ def _clean_tables(db):
     db.commit()
 
 
+@pytest.fixture(autouse=True)
+def _reset_events():
+    """Vacía el feed en memoria de events entre tests (deque + seq son globales de módulo,
+    si no se acumulan y los asserts sobre seq/contenido se vuelven frágiles al orden)."""
+    import events
+    events._events.clear()
+    events._seq = 0
+    yield
+    events._events.clear()
+    events._seq = 0
+
+
 @pytest.fixture
 def client(db):
     """TestClient sobre una app mínima (sin lifespan) que comparte la sesión `db`."""

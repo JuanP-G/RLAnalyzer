@@ -5,6 +5,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.5.1] — 2026-06-18
+
+### Corregido
+- **Replays nuevos no se guardaban** (se descartaban como "corruptos" sin estarlo). Rocket League añadió
+  el atributo `AnonymizedName`; la versión de `boxcars` que usaban los dos parsers no lo decodificaba, y
+  fallaba el parseo de los frames de red de los replays creados desde ~10/06.
+  - **`tools/rrrocket.exe` → v0.11.3** (boxcars con soporte de `AnonymizedName`): restaura los frames de
+    red → visor 3D y stats avanzadas (posesión/posición) de los replays nuevos.
+  - **`subtr-actor` recompilado** (1.0.x desde master): restaura las stats detalladas. Su API renombró
+    `get_stats` → `get_summed_stats` (mismos módulos/campos); el parser usa la que exista (compatibilidad).
+  - **Ingesta resiliente:** `subtr-actor` pasa a ser **opcional** y, si falla o no está, la partida se
+    reconstruye desde la **cabecera de rrrocket** (mapa, equipos, marcador, box-score). Las stats detalladas
+    y la categoría/playlist quedan en `None` hasta tener `subtr-actor` al día. Solo se descarta lo que ni a
+    nivel de cabecera es una partida real → un futuro atributo de RL ya no tira partidas válidas.
+  - Tests del fallback de cabecera y de la API `get_summed_stats`. **119 tests** en total.
+
+---
+
 ## [0.5.0] — 2026-06-11
 
 ### Añadido
