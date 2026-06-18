@@ -182,6 +182,20 @@ def test_fallback_to_rrrocket_header(fake_subtr, fake_replay_file, monkeypatch):
     assert me["boost_collected"] is None and me["avg_speed"] is None   # detalle no disponible
 
 
+def test_uses_get_summed_stats_when_present(fake_subtr, fake_replay_file, monkeypatch):
+    """subtr-actor >=1.0 renombró get_stats → get_summed_stats. El parser usa la que exista."""
+    import sys
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = build_subtr_props()
+    fake.replay_meta_ret = build_subtr_meta()
+    fake.get_stats_ret = build_subtr_stats()
+    mod = sys.modules["subtr_actor"]
+    mod.get_summed_stats = fake.get_stats        # API nueva
+    monkeypatch.delattr(mod, "get_stats", raising=False)   # la antigua ya no está
+    me = next(p for p in parser.parse_replay(fake_replay_file)["players"] if p["is_me"])
+    assert me["avg_boost"] == 45.0 and me["boost_wasted"] == 2100.0   # leído vía get_summed_stats
+
+
 def test_fallback_header_not_a_match_returns_none(fake_subtr, fake_replay_file, monkeypatch):
     """Si ni la cabecera tiene mapa o <2 jugadores, no se inventa nada (la ingesta lo rechaza)."""
     parser, fake = fake_subtr

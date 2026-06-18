@@ -232,13 +232,15 @@ def parse_replay(file_path: str) -> Optional[dict]:
                 result = "draw"
 
         # ── 7. Stats de boost y movimiento por jugador ───────────────────────
+        # subtr-actor >=1.0 renombró get_stats → get_summed_stats (mismos módulos y
+        # campos: amount_collected, boost_integral, speed_integral, tracked_time…).
+        # Se usa la que exista para soportar ambas versiones.
         try:
-            stats = subtr_actor.get_stats(
-                str(path),
-                module_names=["core", "boost", "movement"],
-            )
+            _stats_fn = (getattr(subtr_actor, "get_summed_stats", None)
+                         or getattr(subtr_actor, "get_stats", None))
+            stats = _stats_fn(str(path), module_names=["core", "boost", "movement"]) if _stats_fn else {}
         except Exception as e:
-            logger.warning(f"get_stats falló ({e})")
+            logger.warning(f"stats de subtr-actor fallaron ({e})")
             stats = {}
 
         boost_module    = _safe_get(stats, "modules", "boost") or {}
