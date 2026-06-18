@@ -57,11 +57,15 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  // Dispara un toast de prueba para comprobar que el sistema los muestra.
-  const testNotify = () => {
+  // Dispara un toast de prueba y muestra el resultado REAL devuelto por el sistema.
+  const testNotify = async () => {
     if (window.electronAPI?.notify) {
-      window.electronAPI.notify('RLAnalyzer', 'Notificación de prueba ✓')
-      setMsg({ type: 'ok', text: 'Notificación enviada. Si no la ves, revisa los avisos de Windows.' })
+      const res = await window.electronAPI.notify('RLAnalyzer', 'Notificación de prueba ✓')
+      if (res?.ok) {
+        setMsg({ type: 'ok', text: 'Sistema: enviada. Si no la ves → Ajustes de Windows ▸ Notificaciones (activa RLAnalyzer y desactiva Concentración).' })
+      } else {
+        setMsg({ type: 'err', text: `El sistema la rechazó: ${res?.reason || res?.error || 'motivo desconocido'}` })
+      }
     } else if (typeof Notification !== 'undefined') {
       const fire = () => { try { new Notification('RLAnalyzer', { body: 'Notificación de prueba ✓' }) } catch {} }
       if (Notification.permission === 'granted') fire()

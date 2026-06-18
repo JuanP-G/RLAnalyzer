@@ -286,11 +286,18 @@ ipcMain.handle('backend:restart', () => restartBackend())
 // AppUserModelId. Desde aquí, con setAppUserModelId fijado, sí aparecen.
 const NOTIFY_ICON = path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png')
 ipcMain.handle('notify:show', (_event, { title, body } = {}) => {
+  const supported = Notification.isSupported()
+  console.log('[notify] isSupported=', supported, '| title=', title)
+  if (!supported) return { ok: false, reason: 'unsupported' }
   try {
-    if (!Notification.isSupported()) return { ok: false, reason: 'unsupported' }
-    new Notification({ title: title || 'RLAnalyzer', body: body || '', icon: NOTIFY_ICON, silent: false }).show()
-    return { ok: true }
+    const n = new Notification({ title: title || 'RLAnalyzer', body: body || '', icon: NOTIFY_ICON, silent: false })
+    n.on('show',   ()            => console.log('[notify] mostrada'))
+    n.on('failed', (_e, err)     => console.error('[notify] failed:', err))
+    n.on('click',  ()            => mainWindow?.show())
+    n.show()
+    return { ok: true, supported }
   } catch (err) {
+    console.error('[notify] error:', err)
     return { ok: false, error: err.message }
   }
 })
