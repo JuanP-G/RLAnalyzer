@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reinicia el backend en segundo plano (sin cerrar la ventana)
   restartBackend:     ()         => ipcRenderer.invoke('backend:restart'),
 
+  // Notificación del sistema (toast nativo, vía proceso principal)
+  notify:             (title, body) => ipcRenderer.invoke('notify:show', { title, body }),
+
   // Visor embebido de Ballchasing (WebContentsView)
   bcViewOpen:      (url, bounds) => ipcRenderer.invoke('bcview:open', url, bounds),
   bcViewSetBounds: (bounds)      => ipcRenderer.invoke('bcview:setBounds', bounds),

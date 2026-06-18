@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, WebContentsView, shell, Menu, ipcMain, dialog, Notification } = require('electron')
 const fs = require('fs')
 const { spawn }                      = require('child_process')
 const path                           = require('path')
@@ -280,6 +280,21 @@ ipcMain.handle('dialog:selectFolder', async () => {
 
 ipcMain.handle('backend:restart', () => restartBackend())
 
+// ── IPC: notificaciones del sistema (toast nativo de Windows/macOS) ───────────
+// Se disparan desde el proceso PRINCIPAL (no con el new Notification() del renderer):
+// en Windows, los toasts del renderer se descartan en silencio si la app no tiene
+// AppUserModelId. Desde aquí, con setAppUserModelId fijado, sí aparecen.
+const NOTIFY_ICON = path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+ipcMain.handle('notify:show', (_event, { title, body } = {}) => {
+  try {
+    if (!Notification.isSupported()) return { ok: false, reason: 'unsupported' }
+    new Notification({ title: title || 'RLAnalyzer', body: body || '', icon: NOTIFY_ICON, silent: false }).show()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
 // ── IPC: visor embebido de Ballchasing (WebContentsView) ──────────────────────
 // Usamos WebContentsView en lugar de <webview> porque comparte la misma ruta de
 // render de Chromium que la ventana principal (WebGL/GPU real), de modo que el
@@ -327,6 +342,10 @@ ipcMain.handle('bcview:close', () => {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 Menu.setApplicationMenu(null)   // Elimina la barra de menú nativa (File/Edit/…)
+
+// Identidad de la app para Windows: imprescindible para que los toasts de notificación
+// se muestren (sin esto, Windows los descarta sin avisar). Inofensivo en otras plataformas.
+app.setAppUserModelId('com.rlanalyzer.app')
 
 app.whenReady().then(createWindow)
 
