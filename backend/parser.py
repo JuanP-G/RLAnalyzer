@@ -6,11 +6,20 @@ y los convierte al formato que guardamos en SQLite.
 
 import json
 import logging
+import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import subtr_actor
+# subtr-actor es OPCIONAL: aporta las stats detalladas (boost/movimiento) pero puede no
+# estar instalado o quedarse desactualizado frente a un atributo nuevo de Rocket League.
+# Si falta, el parser sigue funcionando con la cabecera de rrrocket (mapa + box-score).
+try:
+    import subtr_actor
+except Exception as _e:  # pragma: no cover - depende del entorno
+    subtr_actor = None
+    logging.getLogger(__name__).warning(f"subtr-actor no disponible ({_e}); se usará solo la cabecera de rrrocket")
 
 from settings_store import get_player_name
 
@@ -25,6 +34,107 @@ def _safe_get(d, *keys, default=None):
         return d
     except (KeyError, TypeError, IndexError):
         return default
+
+
+def _parse_played_at(date_str):
+    """Convierte la fecha del replay (varios formatos) a datetime, o None."""
+    if not date_str:
+        return None
+    for fmt in ("%Y-%m-%d %H-%M-%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(str(date_str).strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _build_from_header(path: Path) -> Optional[dict]:
+    """Red de seguridad: reconstruye lo esencial de la partida desde la CABECERA de rrrocket
+    (sin '-n': no decodifica los frames de red, así que nunca falla por atributos nuevos de
+    Rocket League como AnonymizedName). Devuelve mapa, equipos, marcador y box-score por
+    jugador. Las stats detalladas (boost/movimiento) y la categoría/playlist quedan en None
+    (eso solo lo da subtr-actor). Devuelve None si ni la cabecera es una partida real."""
+    from replay_frames import RRROCKET_EXE  # ruta ya probada
+    if not os.path.exists(RRROCKET_EXE):
+        logger.warning("Fallback de cabecera no disponible: rrrocket.exe no encontrado")
+        return None
+    try:
+        res = subprocess.run([RRROCKET_EXE, str(path)], capture_output=True, timeout=60)
+        if res.returncode != 0:
+            return None
+        props = (json.loads(res.stdout) or {}).get("properties") or {}
+    except Exception as e:
+        logger.warning(f"rrrocket (cabecera) falló: {e}")
+        return None
+
+    map_name = _safe_get(props, "MapName")
+    header_players = _safe_get(props, "PlayerStats") or []
+    if not map_name or len(header_players) < 2:
+        return None   # tampoco es una partida real a nivel de cabecera
+
+    team0_goals = _safe_get(props, "Team0Score") or 0
+    team1_goals = _safe_get(props, "Team1Score") or 0
+    num_frames  = _safe_get(props, "NumFrames")
+    record_fps  = _safe_get(props, "RecordFPS") or 30.0
+
+    me_name = get_player_name().lower()
+    my_team = None
+
+    players = []
+    for pl in header_players:
+        name = str(_safe_get(pl, "Name") or "Unknown")
+        team = _safe_get(pl, "Team")
+        epic = _safe_get(pl, "PlayerID", "fields", "EpicAccountId")
+        online = _safe_get(pl, "OnlineID")
+        pid = epic if (epic and str(epic) != "0") else (str(online) if online and str(online) != "0" else None)
+        is_me = name.lower() == me_name
+        if is_me and team in (0, 1):
+            my_team = team
+        players.append({
+            "player_name":      name,
+            "platform_id":      pid,
+            "team":             team,
+            "is_me":            is_me,
+            "score":            _safe_get(pl, "Score"),
+            "goals":            _safe_get(pl, "Goals"),
+            "assists":          _safe_get(pl, "Assists"),
+            "saves":            _safe_get(pl, "Saves"),
+            "shots":            _safe_get(pl, "Shots"),
+            "demos_inflicted":  None,
+            # Stats detalladas: las da subtr-actor, no la cabecera → None
+            "boost_collected":  None, "boost_stolen":   None, "boost_wasted":  None,
+            "avg_boost":        None, "avg_speed":      None, "time_supersonic": None,
+            "time_boost_speed": None, "time_slow":      None, "time_on_ground": None,
+            "time_low_air":     None, "time_high_air":  None, "total_distance": None,
+        })
+
+    result = "unknown"
+    if my_team is not None:
+        my_score    = team0_goals if my_team == 0 else team1_goals
+        rival_score = team1_goals if my_team == 0 else team0_goals
+        result = "win" if my_score > rival_score else "loss" if my_score < rival_score else "draw"
+
+    logger.info(f"Cabecera rrrocket: {path.name} | {map_name} | {team0_goals}-{team1_goals} | "
+                f"{len(players)} jugadores | {result} (stats detalladas no disponibles)")
+
+    return {
+        "file_path":     str(path),
+        "file_name":     path.name,
+        "map_name":      map_name,
+        "match_type":    _safe_get(props, "MatchType"),
+        "team_size":     _safe_get(props, "TeamSize"),
+        "playlist_id":   None,        # la cabecera no lo trae
+        "game_category": None,        # sin playlist no se puede clasificar
+        "duration_secs": (num_frames / record_fps) if num_frames else None,
+        "played_at":     _parse_played_at(_safe_get(props, "Date")),
+        "result":        result,
+        "my_team":       my_team,
+        "team0_score":   team0_goals,
+        "team1_score":   team1_goals,
+        "is_solo_queue": True,
+        "raw_meta":      json.dumps({"source": "rrrocket_header"}),
+        "players":       players,
+    }
 
 
 def _player_id_value(pid_dict) -> Optional[str]:
@@ -95,14 +205,7 @@ def parse_replay(file_path: str) -> Optional[dict]:
         team1_goals = sum(1 for g in goals_list if _safe_get(g, "PlayerTeam") == 1)
 
         # ── 4. Fecha de la partida ───────────────────────────────────────────
-        played_at = None
-        if date_str:
-            for fmt in ("%Y-%m-%d %H-%M-%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
-                try:
-                    played_at = datetime.strptime(str(date_str).strip(), fmt)
-                    break
-                except ValueError:
-                    continue
+        played_at = _parse_played_at(date_str)
 
         # ── 5. Identificar mi equipo ─────────────────────────────────────────
         me_name = get_player_name().lower()
@@ -220,6 +323,18 @@ def parse_replay(file_path: str) -> Optional[dict]:
             game_category = "Casual"
         else:
             game_category = None
+
+        # ── Red de seguridad ─────────────────────────────────────────────────
+        # Si subtr-actor no pudo decodificar el replay (p. ej. un atributo nuevo de
+        # Rocket League como AnonymizedName rompe el parseo de los frames), no tenemos
+        # mapa ni jugadores. Antes de descartar la partida, reconstruir lo esencial
+        # desde la cabecera de rrrocket (que no decodifica frames de red). Así no se
+        # pierde la partida; solo faltarán las stats detalladas hasta actualizar subtr.
+        if not map_name or len(players) < 2:
+            logger.warning(f"subtr-actor no parseó {path.name}; probando cabecera de rrrocket")
+            fallback = _build_from_header(path)
+            if fallback:
+                return fallback
 
         return {
             "file_path":     str(path),
