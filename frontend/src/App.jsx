@@ -30,6 +30,7 @@ export default function App() {
   useEffect(() => {
     let seq = 0
     let timer = null
+    let cancelled = false   // evita un 2º intervalo fugado (StrictMode monta el efecto 2 veces)
 
     // En la app de escritorio se usa el toast NATIVO (proceso principal de Electron): en
     // Windows el new Notification() del renderer se descarta si la app no tiene identidad.
@@ -59,9 +60,9 @@ export default function App() {
     api.notifications(0)
       .then(d => { seq = d.last_seq || 0 })
       .catch(() => {})
-      .finally(() => { timer = setInterval(poll, 30000) })
+      .finally(() => { if (!cancelled) timer = setInterval(poll, 30000) })
 
-    return () => { if (timer) clearInterval(timer) }
+    return () => { cancelled = true; if (timer) clearInterval(timer) }
   }, [])
 
   return (
