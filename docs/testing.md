@@ -21,7 +21,7 @@ Marcadores: `py -m pytest tests -m unit` (lógica pura, rápido) y `-m api` (end
 
 Cobertura: `py -m pytest --cov=. --cov-report=term-missing` (requiere `pytest-cov`, ya en `requirements-dev.txt`).
 
-**Cobertura actual (116 tests):**
+**Cobertura actual (119 tests):**
 - **Unitarios:** `stats._metric_value`/`_avg`/`_is_abnormal`/`_parse_date`, `database._playlist_to_category`,
   `players._group_stats`, `profile._parse`/`_first`/`_extract_json_at` (incl. que el percentil/rank salen de
   `rating.*`, no de `tier.*`, y la racha negativa en derrotas), `settings_store` (default/set/invalidate).
@@ -35,6 +35,9 @@ Cobertura: `py -m pytest --cov=. --cov-report=term-missing` (requiere `pytest-co
   2v2 (mapa, modo, playlist→categoría, duración, fecha, V/D desde "yo", cruce boost/movement, avg_speed km/h)
   y ramas (sin archivo→None, sin "yo"→unknown, get_stats falla, fecha inválida, playlist Casual/None,
   tracked_time=0); helpers `_safe_get`/`_player_id_value`. **parser.py ~94%.**
+  - **Resiliencia del parser:** API nueva `get_summed_stats` (subtr ≥1.0) además de `get_stats`; y el
+    **fallback a la cabecera de rrrocket** cuando subtr falla (reconstruye mapa+box-score; `subprocess.run`
+    mockeado) — incl. el caso de cabecera-no-partida → no se inventa nada.
 - **Frames 3D** (`replay_frames.py`, `rrrocket` mockeado): helpers puros (`_is_ball/_is_car/_uid_key/
   _name_from_uid/_quat_to_yaw`), `_parse_rrrocket` con JSON de muestra (dedup de respawn, Epic→`Car_N`,
   goles, ball `[t,x,y,z]`, cars `[t,idx,…]`, muestreo), `extract_frames` (mock de `subprocess.run`:
