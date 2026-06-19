@@ -5,6 +5,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.7.0] — 2026-06-19
+
+### Añadido
+- **Mapa de tiros** en el detalle de cada partida: una portería de Rocket League dibujada (SVG) con
+  un punto por tiro, coloreado por resultado — 🟢 gol · 🔵 parada · 🟠 fuera — y **tooltip al pasar el
+  ratón** con tirador, velocidad y distancia. Toggle **Tus tiros / Tiros recibidos**.
+  - Backend `shot_map.compute_shots(frames, touches)` (puro): identifica los tiros (toques con
+    `intention=="shot"` de subtr-actor), **extrapola** la trayectoria del balón al plano de portería
+    (con gravedad) para situar el impacto, y clasifica el resultado cruzando con goles/paradas.
+  - Endpoint `GET /api/replays/{id}/shots` — perezoso, con **caché en disco** (`data/shots/{id}.json`).
+  - Nota: el resultado (gol/parada/fuera) es heurístico; la posición y la velocidad son fiables.
+
+---
+
 ## [0.6.0] — 2026-06-18
 
 ### Añadido

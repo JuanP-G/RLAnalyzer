@@ -16,6 +16,11 @@ SIDE_WALL_X   = 4096.0
 CEILING_Z     = 2044.0
 UU_PER_METER  = 100.0
 
+# Boca de portería (para el mapa de tiros): ancho ±892.755, alto 0..642.775.
+GOAL_HALF_WIDTH = 892.755
+GOAL_HEIGHT     = 642.775
+GRAVITY         = 650.0   # UU/s² (gravedad de Rocket League, para la caída del balón)
+
 
 def own_goal_y(team: int) -> float:
     """Coordenada Y de la portería propia y ÚNICA fuente de verdad del eje de campo:

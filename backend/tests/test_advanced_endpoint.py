@@ -90,6 +90,41 @@ def test_compute_and_persist_demos(client, db, fake_replay_file, monkeypatch):
     assert (opp.demos_inflicted, opp.demos_taken, opp.demos_computed) == (0, 2, True)
 
 
+def test_shots_endpoint(client, db, fake_replay_file, tmp_path, monkeypatch):
+    """/shots: calcula (frames + toques), resuelve nombre por platform_id, cachea y reusa."""
+    import sys, types
+    players = [make_player(ME, 0, is_me=True, platform_id="pid-me"),
+               make_player("Rival", 1, platform_id="pid-op")]
+    r = make_replay(db, players=players, file_path=fake_replay_file, my_team=0)
+
+    monkeypatch.setattr("routers.replays._shots_cache_path", lambda rid: str(tmp_path / f"{rid}.json"))
+    frames = {"ball": [[10.0, 0, 4000, 100], [10.1, 0, 4200, 100],
+                       [10.2, 0, 4400, 100], [10.3, 0, 4600, 100]],
+              "goals": [{"team": 0, "time": 10.3}]}
+    monkeypatch.setattr("replay_frames.get_frames_cached", lambda rid, path: frames)
+    fake = types.ModuleType("subtr_actor")
+    fake.get_summed_stats = lambda path, module_names=None: {"modules": {"touch": {"events": [
+        {"intention": "shot", "is_team_0": True, "time": 10.0,
+         "player": {"Epic": "pid-me"}, "ball_movement": {"end_time": 10.4}},
+    ]}}}
+    monkeypatch.setitem(sys.modules, "subtr_actor", fake)
+
+    out = client.get(f"/api/replays/{r.id}/shots").json()
+    assert out["computed"] is True and out["my_team"] == 0
+    assert len(out["shots"]) == 1
+    s = out["shots"][0]
+    assert s["player"] == ME and s["team"] == 0 and s["outcome"] == "gol"
+    assert s["on_target"] is True and s["speed_kmh"] > 0
+    # 2ª llamada → desde caché
+    assert client.get(f"/api/replays/{r.id}/shots").json()["shots"][0]["player"] == ME
+
+
+def test_shots_no_local_replay(client, db):
+    r = make_replay(db, file_path="C:/no/existe.replay")
+    out = client.get(f"/api/replays/{r.id}/shots").json()
+    assert out["computed"] is False and out["reason"] == "no_local_replay"
+
+
 class _FakePS:
     def __init__(self, name, team):
         self.player_name, self.team = name, team

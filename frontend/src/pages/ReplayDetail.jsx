@@ -444,6 +444,142 @@ function PositioningPanel({ replayId, teamSize }) {
   )
 }
 
+// ── Mapa de tiros ───────────────────────────────────────────────────────────────
+const SHOT_COLOR = { gol: '#3DDB85', parada: '#00A8FF', fuera: '#FF6B35' }
+const SHOT_LABEL = { gol: 'Gol', parada: 'Parada', fuera: 'Fuera' }
+
+function GoalSvg({ shots }) {
+  // Geometría: boca de portería X∈[-893,893], Z∈[0,643] UU. Escala fija px/UU.
+  const S = 0.13, CX = 180, GROUND = 170
+  const gx = ux => CX + ux * S
+  const gy = uz => GROUND - uz * S
+  const gw = 893 * S, gh = 643 * S      // medio ancho y alto en px
+  const left = CX - gw, right = CX + gw, top = GROUND - gh
+  const plotted = shots.filter(s => s.target_x != null && s.target_z != null)
+
+  return (
+    <svg viewBox="0 0 360 210" className="w-full" style={{ maxHeight: 280 }}>
+      {/* Suelo */}
+      <line x1="20" y1={GROUND} x2="340" y2={GROUND} stroke="#1A3A5C" strokeWidth="1.5" />
+      {/* Red (rejilla) */}
+      <defs>
+        <pattern id="net" width="10" height="10" patternUnits="userSpaceOnUse">
+          <path d="M10 0H0V10" fill="none" stroke="#163150" strokeWidth="0.6" />
+        </pattern>
+      </defs>
+      <rect x={left} y={top} width={gw * 2} height={gh} fill="url(#net)" opacity="0.8" />
+      {/* Marco de portería */}
+      <rect x={left} y={top} width={gw * 2} height={gh} fill="none" stroke="#3B6390" strokeWidth="2.5" />
+      {/* Puntos de tiro */}
+      {plotted.map((s, i) => (
+        <circle key={i} cx={gx(s.target_x)} cy={gy(s.target_z)} r="4.5"
+                fill={SHOT_COLOR[s.outcome] || '#888'} fillOpacity="0.85"
+                stroke="#04101E" strokeWidth="1">
+          <title>{`${s.player} · ${s.speed_kmh ?? '?'} km/h · ${SHOT_LABEL[s.outcome] || s.outcome}`
+                  + (s.dist_m != null ? ` · desde ${s.dist_m} m` : '')}</title>
+        </circle>
+      ))}
+    </svg>
+  )
+}
+
+function ShotMapPanel({ replayId, myTeam }) {
+  const [open, setOpen]       = useState(false)
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [side, setSide]       = useState('mine')   // mine | against
+
+  const load = () => {
+    setLoading(true)
+    api.replayShots(replayId)
+      .then(setData)
+      .catch(e => setData({ computed: false, reason: 'compute_error', detail: e.message }))
+      .finally(() => setLoading(false))
+  }
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && !data && !loading) load()
+  }
+
+  const mt = data?.my_team ?? myTeam
+  const allShots = data?.shots || []
+  const shots = allShots.filter(s => side === 'mine' ? s.team === mt : s.team !== mt)
+  const counts = shots.reduce((a, s) => { a[s.outcome] = (a[s.outcome] || 0) + 1; return a }, {})
+  const noTarget = shots.filter(s => s.target_x == null).length
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: '#071829', border: '1px solid #122A4D' }}>
+      <button onClick={toggle}
+        className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-bg-hover"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+        <span className="font-display font-semibold text-gray-300 text-xs uppercase tracking-widest">
+          Mapa de tiros
+        </span>
+        <span className="text-rl-blue text-xs">{open ? '▾ ocultar' : '▸ ver'}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4" style={{ borderTop: '1px solid #0D2240' }}>
+          {loading && <p className="text-gray-500 text-sm py-4">Calculando… (la 1ª vez puede tardar unos segundos).</p>}
+
+          {!loading && data && data.computed === false && (
+            <div className="py-4">
+              <p className="text-gray-400 text-sm">
+                {data.reason === 'no_local_replay'
+                  ? 'El archivo .replay no está en este equipo, así que no se puede calcular el mapa de tiros.'
+                  : 'No se pudo calcular el mapa de tiros.'}
+              </p>
+              {data.reason !== 'no_local_replay' && (
+                <button onClick={load} className="mt-2 px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:text-white"
+                  style={{ background: '#0D2240', border: '1px solid #1A3A5C' }}>↻ Reintentar</button>
+              )}
+            </div>
+          )}
+
+          {!loading && data && data.computed && (
+            <div className="pt-3 space-y-3">
+              {/* Toggle tuyos / recibidos */}
+              <div className="flex gap-1.5">
+                {[{ id: 'mine', label: 'Tus tiros' }, { id: 'against', label: 'Tiros recibidos' }].map(o => (
+                  <button key={o.id} onClick={() => setSide(o.id)}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                    style={side === o.id
+                      ? { background: 'rgba(0,168,255,0.15)', border: '1px solid rgba(0,168,255,0.35)', color: '#fff' }
+                      : { background: '#0D2240', border: '1px solid #1A3A5C', color: '#6590BC' }}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              {shots.length === 0 ? (
+                <p className="text-gray-500 text-sm py-4">No hay tiros {side === 'mine' ? 'tuyos' : 'recibidos'} en esta partida.</p>
+              ) : (
+                <>
+                  <GoalSvg shots={shots} />
+                  {/* Leyenda + conteos */}
+                  <div className="flex items-center justify-center gap-4 text-xs">
+                    {['gol', 'parada', 'fuera'].map(o => (
+                      <span key={o} className="flex items-center gap-1.5 text-gray-300">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: SHOT_COLOR[o] }} />
+                        {SHOT_LABEL[o]} <span className="font-mono-num text-gray-400">{counts[o] || 0}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-500 text-center">
+                    Pasa el ratón por cada punto para ver tirador y velocidad.
+                    {noTarget > 0 && ` · ${noTarget} tiro${noTarget !== 1 ? 's' : ''} sin trayectoria clara a puerta (no se dibuja${noTarget !== 1 ? 'n' : ''}).`}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function ReplayDetail() {
   const { id }     = useParams()
@@ -691,6 +827,9 @@ export default function ReplayDetail() {
       </div>
       <div className="animate-fade-up" style={{ animationDelay: '0.35s' }}>
         <PositioningPanel replayId={id} teamSize={replay.team_size} />
+      </div>
+      <div className="animate-fade-up" style={{ animationDelay: '0.4s' }}>
+        <ShotMapPanel replayId={id} myTeam={replay.my_team} />
       </div>
     </div>
     </div>

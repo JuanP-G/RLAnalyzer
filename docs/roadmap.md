@@ -73,7 +73,10 @@
   disponibles en `demolitions`).
 - Pendiente: **bumpeos** (choques sin demo) — datos ya disponibles (módulo `bump` con eventos
   initiator→victim) — Fase C
-- Pendiente: **mapa de tiros** (portería + dónde fueron los disparos) — viz espacial desde frames
+- ✅ **Mapa de tiros** — portería SVG con los tiros por resultado (gol/parada/fuera) + velocidad al
+  pasar el ratón, en el detalle de cada partida — **hecho (v0.7.0)**. Pendiente posible: versión
+  agregada en Análisis (todos tus tiros del periodo).
+- Pendiente: **mapa de demoliciones** pareado (quién→quién, datos en `demolitions`).
 
 #### Exportar replay como video/GIF
 - Capturar frames del canvas Three.js y codificar como video o GIF animado
