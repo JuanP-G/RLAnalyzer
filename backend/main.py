@@ -202,22 +202,29 @@ async def process_pending_loop():
         await asyncio.sleep(5)
 
 
-async def _backfill_loop(label, flag_col, compute_fn, initial_delay=25):
+async def _backfill_loop(label, flag_col, compute_fn, initial_delay=25, pace=12):
     """Bucle genérico de backfill en segundo plano: busca partidas cuyos PlayerStat tienen
     `flag_col` en False y, si hay .replay local, las calcula con `compute_fn(db, replay)`
-    (una por iteración, ~12s, para no saturar). Las no calculables (sin archivo o error) se
-    marcan como intentadas para llegar al 100% y no reintentarlas. Pausable desde Ajustes."""
+    (una por iteración). Las no calculables (sin archivo o error) se marcan como intentadas
+    para llegar al 100% y no reintentarlas. BLINDADO: cualquier excepción de `compute_fn`
+    se captura (rollback + marcar) para que una sola partida nunca pueda atascar el bucle.
+    Pausable desde Ajustes (toggle advanced_background)."""
     import os as _os
     import settings_store
 
     flag_attr = flag_col.key
     def _mark_attempted(replay, db):
-        for p in replay.players:
-            setattr(p, flag_attr, True)
-        db.commit()
+        try:
+            for p in replay.players:
+                setattr(p, flag_attr, True)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"{label}: no se pudo marcar replay {getattr(replay,'id','?')}: {e}")
 
     await asyncio.sleep(initial_delay)
     while True:
+        did_work = False
         try:
             if settings_store.get_advanced_background():
                 db = SessionLocal()
@@ -234,27 +241,35 @@ async def _backfill_loop(label, flag_col, compute_fn, initial_delay=25):
                             _mark_attempted(r, db)
                             continue
                         logger.info(f"{label}: replay {rid}")
-                        if not compute_fn(db, r):
-                            _mark_attempted(r, db)
-                        break   # solo una extracción real por iteración (ritmo suave)
+                        try:
+                            ok = compute_fn(db, r)
+                        except Exception as e:
+                            db.rollback()
+                            logger.warning(f"{label} replay {rid} falló: {e}")
+                            ok = False
+                        if not ok:
+                            _mark_attempted(r, db)   # intentada → no reintentar
+                        did_work = True
+                        break   # solo una extracción real por iteración
                 finally:
                     db.close()
         except Exception as e:
             logger.warning(f"{label}: {e}")
-        await asyncio.sleep(12)
+        # Ritmo: cuando hay trabajo, pausa corta; si no hay nada pendiente, espera más.
+        await asyncio.sleep(pace if did_work else 30)
 
 
 async def advanced_backfill_loop():
-    """Backfill de stats avanzadas (posición/posesión) — frames con rrrocket."""
+    """Backfill de stats avanzadas (posición/posesión) — frames con rrrocket (pesado)."""
     from routers.replays import compute_and_persist_advanced
     await _backfill_loop("Backfill stats avanzadas", PlayerStat.advanced_computed,
-                         compute_and_persist_advanced, initial_delay=25)
+                         compute_and_persist_advanced, initial_delay=25, pace=12)
 
 
 async def demos_backfill_loop():
     """Backfill de demoliciones (módulo demo de subtr-actor) en partidas ya guardadas."""
     await _backfill_loop("Backfill demos", PlayerStat.demos_computed,
-                         compute_and_persist_demos, initial_delay=35)
+                         compute_and_persist_demos, initial_delay=15, pace=2)
 
 
 @asynccontextmanager
