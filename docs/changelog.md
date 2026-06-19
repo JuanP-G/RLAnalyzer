@@ -5,6 +5,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.6.0] — 2026-06-18
+
+### Añadido
+- **Análisis por sectores**: las pestañas de grupo se agrupan visualmente en **General**
+  (Ofensiva, Defensa), **Ataque** (Tiros/Puntería, Contacto) y **Movilidad** (Boost, Movimiento,
+  Posicionamiento). Tiros/Puntería pasa a ser su propio grupo (antes dentro de Ofensiva).
+- **Demoliciones** (grupo "Contacto"): `demos_inflicted` (demos hechas) y `demos_taken` (recibidas)
+  por jugador, del módulo `demo` de subtr-actor (≥1.0). Aparecen en Análisis como el resto (radar,
+  victorias vs derrotas, evolución) y en el detalle de partida.
+  - **Backfill** en segundo plano de las partidas ya guardadas (mismo patrón y toggle que el de stats
+    avanzadas; el bucle se generalizó en `_backfill_loop`). Columnas nuevas `demos_taken` + `demos_computed`.
+
+---
+
 ## [0.5.1] — 2026-06-18
 
 ### Corregido

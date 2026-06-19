@@ -1,7 +1,7 @@
 """Tests de GET /api/replays/{id}/advanced (cálculo perezoso + persistencia)."""
 import pytest
 
-from tests.factories import make_replay, ME
+from tests.factories import make_replay, make_player, ME
 
 pytestmark = pytest.mark.api
 
@@ -64,6 +64,30 @@ def test_advanced_compute_error(client, db, fake_replay_file, monkeypatch):
 
 def test_advanced_404(client):
     assert client.get("/api/replays/99999/advanced").status_code == 404
+
+
+def test_compute_and_persist_demos(client, db, fake_replay_file, monkeypatch):
+    """El backfill de demos empareja por platform_id y persiste inflicted/taken + computed."""
+    import sys, types
+    players = [
+        make_player(ME, team=0, is_me=True, platform_id="pid-me", demos_computed=False, demos_inflicted=None),
+        make_player("Opp", team=1, platform_id="pid-opp", demos_computed=False, demos_inflicted=None),
+    ]
+    r = make_replay(db, players=players, file_path=fake_replay_file)
+
+    fake = types.ModuleType("subtr_actor")
+    fake.get_summed_stats = lambda path, module_names=None: {"modules": {"demo": {"player_stats": [
+        {"player_id": {"Epic": "pid-me"},  "stats": {"demos_inflicted": 3, "demos_taken": 1}},
+        {"player_id": {"Epic": "pid-opp"}, "stats": {"demos_inflicted": 0, "demos_taken": 2}},
+    ]}}}
+    monkeypatch.setitem(sys.modules, "subtr_actor", fake)
+
+    import main
+    assert main.compute_and_persist_demos(db, r) is True
+    me = next(p for p in r.players if p.is_me)
+    opp = next(p for p in r.players if not p.is_me)
+    assert (me.demos_inflicted, me.demos_taken, me.demos_computed) == (3, 1, True)
+    assert (opp.demos_inflicted, opp.demos_taken, opp.demos_computed) == (0, 2, True)
 
 
 class _FakePS:

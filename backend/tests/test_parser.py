@@ -214,6 +214,28 @@ def test_fallback_header_not_a_match_returns_none(fake_subtr, fake_replay_file, 
     assert data["map_name"] is None and len(data["players"]) == 0
 
 
+def test_demos_extracted(fake_subtr, fake_replay_file):
+    """El módulo demo de subtr puebla demos_inflicted/taken y marca demos_computed."""
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = build_subtr_props()
+    fake.replay_meta_ret = build_subtr_meta()
+    fake.get_stats_ret = build_subtr_stats()           # incluye módulo demo
+    me = next(p for p in parser.parse_replay(fake_replay_file)["players"] if p["is_me"])
+    assert me["demos_inflicted"] == 2 and me["demos_taken"] == 1
+    assert me["demos_computed"] is True
+
+
+def test_demos_absent_module_leaves_none(fake_subtr, fake_replay_file):
+    """Sin módulo demo (subtr antiguo o fallo), demos quedan None y demos_computed False."""
+    parser, fake = fake_subtr
+    fake.parse_replay_ret = build_subtr_props()
+    fake.replay_meta_ret = build_subtr_meta()
+    fake.get_stats_ret = build_subtr_stats(include_demo=False)
+    me = next(p for p in parser.parse_replay(fake_replay_file)["players"] if p["is_me"])
+    assert me["demos_inflicted"] is None and me["demos_taken"] is None
+    assert me["demos_computed"] is False
+
+
 def test_result_loss(fake_subtr, fake_replay_file):
     parser, fake = fake_subtr
     fake.parse_replay_ret = build_subtr_props(goals_teams=(1, 1, 0))  # team0=1, team1=2

@@ -54,13 +54,19 @@ METRICS = [
      "desc": "Goles marcados en la partida.", "source": SRC_HEADER},
     {"key": "assists",         "label": "Asistencias",         "group": "offense",  "higher_better": True,  "unit": "",
      "desc": "Pases que terminan en gol de un compañero.", "source": SRC_HEADER},
-    {"key": "shots",           "label": "Tiros",               "group": "offense",  "higher_better": True,  "unit": "",
+    # Tiros / Puntería
+    {"key": "shots",           "label": "Tiros",               "group": "shots",    "higher_better": True,  "unit": "",
      "desc": "Tiros a puerta realizados.", "source": SRC_HEADER},
-    {"key": "shooting_pct",    "label": "% Acierto de tiro",   "group": "offense",  "higher_better": True,  "unit": "%",
+    {"key": "shooting_pct",    "label": "% Acierto de tiro",   "group": "shots",    "higher_better": True,  "unit": "%",
      "desc": "Goles ÷ tiros × 100. Eficacia de cara a portería.", "source": SRC_HEADER + " (derivado)"},
     # Defensa
     {"key": "saves",           "label": "Paradas",             "group": "defense",  "higher_better": True,  "unit": "",
      "desc": "Despejes que evitan un gol del rival.", "source": SRC_HEADER},
+    # Contacto (demoliciones)
+    {"key": "demos_inflicted", "label": "Demos hechas",        "group": "contact",  "higher_better": True,  "unit": "",
+     "desc": "Demoliciones que has provocado al rival (le revientas el coche).", "source": SRC_ADV},
+    {"key": "demos_taken",     "label": "Demos recibidas",     "group": "contact",  "higher_better": False, "unit": "",
+     "desc": "Veces que te han demolido a ti.", "source": SRC_ADV},
     # Boost
     {"key": "avg_boost",       "label": "Boost medio",         "group": "boost",    "higher_better": True,  "unit": "",
      "desc": "Indicador del boost que sueles mantener disponible (integral de boost en el tiempo). Más alto = mejor gestión.", "source": SRC_ADV},

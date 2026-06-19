@@ -101,6 +101,8 @@ def _build_from_header(path: Path) -> Optional[dict]:
             "saves":            _safe_get(pl, "Saves"),
             "shots":            _safe_get(pl, "Shots"),
             "demos_inflicted":  None,
+            "demos_taken":      None,
+            "demos_computed":   False,
             # Stats detalladas: las da subtr-actor, no la cabecera → None
             "boost_collected":  None, "boost_stolen":   None, "boost_wasted":  None,
             "avg_boost":        None, "avg_speed":      None, "time_supersonic": None,
@@ -235,29 +237,31 @@ def parse_replay(file_path: str) -> Optional[dict]:
         # subtr-actor >=1.0 renombró get_stats → get_summed_stats (mismos módulos y
         # campos: amount_collected, boost_integral, speed_integral, tracked_time…).
         # Se usa la que exista para soportar ambas versiones.
+        # módulo "demo" (subtr >=1.0): demos_inflicted / demos_taken por jugador.
         try:
             _stats_fn = (getattr(subtr_actor, "get_summed_stats", None)
                          or getattr(subtr_actor, "get_stats", None))
-            stats = _stats_fn(str(path), module_names=["core", "boost", "movement"]) if _stats_fn else {}
+            stats = _stats_fn(str(path), module_names=["core", "boost", "movement", "demo"]) if _stats_fn else {}
         except Exception as e:
             logger.warning(f"stats de subtr-actor fallaron ({e})")
             stats = {}
 
         boost_module    = _safe_get(stats, "modules", "boost") or {}
         movement_module = _safe_get(stats, "modules", "movement") or {}
+        demo_module     = _safe_get(stats, "modules", "demo")
+        demos_available = demo_module is not None   # subtr trae el módulo → demos calculables
 
-        # Lookup {player_id_value -> stats_dict} para boost y movement
-        boost_by_pid: dict = {}
-        for ps in _safe_get(boost_module, "player_stats") or []:
-            pid = _player_id_value(_safe_get(ps, "player_id"))
-            if pid:
-                boost_by_pid[pid] = _safe_get(ps, "stats") or {}
+        def _by_pid(module):
+            out = {}
+            for ps in _safe_get(module, "player_stats") or []:
+                pid = _player_id_value(_safe_get(ps, "player_id"))
+                if pid:
+                    out[pid] = _safe_get(ps, "stats") or {}
+            return out
 
-        movement_by_pid: dict = {}
-        for ps in _safe_get(movement_module, "player_stats") or []:
-            pid = _player_id_value(_safe_get(ps, "player_id"))
-            if pid:
-                movement_by_pid[pid] = _safe_get(ps, "stats") or {}
+        boost_by_pid    = _by_pid(boost_module)
+        movement_by_pid = _by_pid(movement_module)
+        demo_by_pid     = _by_pid(demo_module or {})
 
         # ── 8. Construir lista de jugadores ──────────────────────────────────
         players = []
@@ -270,6 +274,7 @@ def parse_replay(file_path: str) -> Optional[dict]:
 
                 b = boost_by_pid.get(pid_value) or {}
                 m = movement_by_pid.get(pid_value) or {}
+                d = demo_by_pid.get(pid_value) or {}
 
                 is_me = str(name).lower() == me_name
 
@@ -283,7 +288,10 @@ def parse_replay(file_path: str) -> Optional[dict]:
                     "assists":          _safe_get(p_stats, "Assists"),
                     "saves":            _safe_get(p_stats, "Saves"),
                     "shots":            _safe_get(p_stats, "Shots"),
-                    "demos_inflicted":  None,
+                    # Demoliciones (None si subtr no trae el módulo demo)
+                    "demos_inflicted":  _safe_get(d, "demos_inflicted") if demos_available else None,
+                    "demos_taken":      _safe_get(d, "demos_taken") if demos_available else None,
+                    "demos_computed":   demos_available,
                     # Boost individual
                     "boost_collected":  _safe_get(b, "amount_collected"),
                     "boost_stolen":     _safe_get(b, "amount_stolen"),

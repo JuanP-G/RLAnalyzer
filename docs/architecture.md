@@ -102,6 +102,7 @@ FastAPI con Uvicorn. Puerto 8000. Base de datos local SQLite.
 4. `asyncio.create_task(process_pending_loop())` — bucle cada 5s que procesa la cola
 5. `delete_invalid_replays()` — elimina partidas no válidas (corruptas/no-partidas) que ya estuvieran en la BD
 6. `asyncio.create_task(advanced_backfill_loop())` — bucle que calcula stats avanzadas pendientes en 2º plano (~1 partida cada 12s; pausable desde Ajustes; las no calculables se marcan intentadas para llegar al 100%)
+7. `asyncio.create_task(demos_backfill_loop())` — análogo para las demoliciones (módulo `demo` de subtr-actor). Ambos usan el helper genérico `_backfill_loop(label, flag_col, compute_fn)`
 
 **Validación de partidas:** `events.is_valid_match(data)` rechaza replays sin mapa o con < 2 jugadores
 (corruptos, freeplay, menú): `save_replay_to_db` **no los inserta**, los registra en `events` y el frontend

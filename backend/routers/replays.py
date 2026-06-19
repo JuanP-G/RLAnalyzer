@@ -56,6 +56,7 @@ def player_to_dict(p: PlayerStat) -> dict:
         "saves":           p.saves,
         "shots":           p.shots,
         "demos_inflicted": p.demos_inflicted,
+        "demos_taken":     p.demos_taken,
         "boost_collected": p.boost_collected,
         "boost_stolen":    p.boost_stolen,
         "boost_wasted":    p.boost_wasted,
