@@ -204,6 +204,25 @@ Si no se puede: `{ "computed": false, "reason": "no_local_replay" | "compute_err
 
 ---
 
+### `GET /api/replays/{replay_id}/shots`
+
+Mapa de tiros de la partida. **Cálculo perezoso** (frames de rrrocket + módulo `touch` de subtr-actor) con **caché en disco** (`data/shots/{id}.json`). Cada tiro se proyecta al plano de portería (con gravedad) para situar el impacto; el resultado es heurístico.
+
+**Respuesta (calculado):**
+```json
+{
+  "computed": true,
+  "my_team": 0,
+  "shots": [
+    { "player": "GustoffotsuG", "team": 0, "target_x": -517, "target_z": 40,
+      "on_target": true, "outcome": "gol", "speed_kmh": 98, "dist_m": 27.8, "time": 63.1 }
+  ]
+}
+```
+`outcome` ∈ `gol` | `parada` | `fuera`. `target_x/target_z` pueden ser `null` si el tiro no llevaba trayectoria clara a puerta. Si no se puede: `{ "computed": false, "reason": "no_local_replay" | "compute_error" }`.
+
+---
+
 ## Stats
 
 ### `GET /api/stats/summary`

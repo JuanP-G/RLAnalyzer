@@ -444,6 +444,72 @@ def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
             "teams": _team_possession(r.players)}
 
 
+# ── Mapa de tiros (perezoso + caché en disco) ─────────────────────────────────
+
+# Sube esta versión si cambia el algoritmo de cálculo: invalida cachés viejas en disco.
+SHOTS_CACHE_VERSION = 2
+
+
+def _shots_cache_path(replay_id: int) -> str:
+    import os
+    from config import BASE_DIR
+    d = os.path.join(BASE_DIR, "data", "shots")
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, f"{replay_id}.json")
+
+
+@router.get("/replays/{replay_id}/shots")
+def get_replay_shots(replay_id: int, db: Session = Depends(get_db)):
+    """Mapa de tiros: a qué punto de la portería fue cada tiro, resultado (gol/parada/fuera)
+    y velocidad. Cálculo perezoso (frames de rrrocket + toques de subtr-actor) con caché en
+    disco; la 1ª vez puede tardar unos segundos."""
+    import os, json
+
+    r = db.query(Replay).filter(Replay.id == replay_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Replay no encontrado")
+
+    cache = _shots_cache_path(replay_id)
+    if os.path.exists(cache):
+        try:
+            with open(cache, encoding="utf-8") as f:
+                cached = json.load(f)
+            if cached.get("v") == SHOTS_CACHE_VERSION:   # versión actual → servir
+                return cached
+        except Exception:
+            pass   # caché corrupta/vieja → recalcular
+
+    if not r.file_path or not os.path.exists(r.file_path):
+        return {"computed": False, "reason": "no_local_replay"}
+
+    try:
+        import subtr_actor
+        from replay_frames import get_frames_cached
+        from shot_map import compute_shots
+        from parser import _player_id_value, _safe_get
+
+        frames = get_frames_cached(replay_id, r.file_path)
+        fn = getattr(subtr_actor, "get_summed_stats", None) or getattr(subtr_actor, "get_stats", None)
+        touch = _safe_get(fn(str(r.file_path), module_names=["touch"]), "modules", "touch") or {}
+        shots = compute_shots(frames, touch.get("events") or [])
+    except Exception as e:
+        logger.error(f"Error calculando mapa de tiros replay {replay_id}: {e}")
+        return {"computed": False, "reason": "compute_error"}
+
+    # Resolver player_id → nombre real (la cabecera no anonimiza) vía platform_id
+    id_to_name = {p.platform_id: p.player_name for p in r.players if p.platform_id}
+    for sh in shots:
+        sh["player"] = id_to_name.get(_player_id_value(sh.pop("player_id"))) or "?"
+
+    result = {"computed": True, "v": SHOTS_CACHE_VERSION, "my_team": r.my_team, "shots": shots}
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump(result, f)
+    except Exception as e:
+        logger.warning(f"No se pudo cachear el mapa de tiros {replay_id}: {e}")
+    return result
+
+
 # ── Partidas no válidas (corruptas / no-partidas) ────────────────────────────
 
 def delete_invalid_replays(db) -> int:
