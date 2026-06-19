@@ -12,7 +12,7 @@ el tiro aunque lo parasen (si esperáramos al cruce real, un tiro parado no tend
 """
 import math
 
-from field_constants import GOAL_Y, GOAL_HALF_WIDTH, GOAL_HEIGHT, GRAVITY, uu_to_m
+from field_constants import GOAL_Y, GOAL_HALF_WIDTH, GOAL_HEIGHT, uu_to_m
 
 UU_TO_KMH = 0.036   # UU/s → km/h (1 UU = 1 cm; ×0.01 = m/s; ×3.6 = km/h)
 
@@ -31,23 +31,45 @@ def _ball_at(ball, t):
     return [prev[1], prev[2], prev[3]] if prev else [0.0, 0.0, 0.0]
 
 
-def _target_on_goal(ball, t0, target_y):
-    """Extrapola la velocidad del balón tras el toque hasta el plano Y=target_y.
-    Devuelve (x, z) del impacto (z con gravedad) y la velocidad en km/h, o (None, speed)."""
+def _speed_kmh(ball, t0):
+    """Velocidad del balón justo tras el toque, en km/h."""
     p0 = _ball_at(ball, t0 + 0.05)
     p1 = _ball_at(ball, t0 + 0.20)
-    dt = 0.15
-    vx, vy, vz = ((p1[i] - p0[i]) / dt for i in range(3))
-    speed_kmh = round(math.dist(p0, p1) / dt * UU_TO_KMH)
-    # ¿va hacia la portería objetivo? (signo de vy coherente y con algo de velocidad)
+    return round(math.dist(p0, p1) / 0.15 * UU_TO_KMH)
+
+
+def _real_crossing(ball, t0, t_max, target_y):
+    """Primer punto (x, z) donde el balón cruza el plano Y=target_y entre t0 y t_max,
+    leído de los frames reales (exacto: respeta arcos, rebotes y entradas a portería)."""
+    prev = None
+    for b in ball:
+        if b[0] < t0:
+            prev = b
+            continue
+        if b[0] > t_max:
+            break
+        if prev is not None:
+            y0, y1 = prev[2], b[2]
+            if (y0 - target_y) * (y1 - target_y) <= 0 and y1 != y0:
+                k = (target_y - y0) / (y1 - y0)
+                return round(prev[1] + (b[1] - prev[1]) * k), round(prev[3] + (b[3] - prev[3]) * k)
+        prev = b
+    return None
+
+
+def _extrapolated(ball, t0, target_y):
+    """Estimación recta (sin gravedad) de dónde iba el tiro, para cuando no hay cruce real
+    (p. ej. una parada lo detiene antes del plano). Sin gravedad: evita que un tiro largo
+    se 'hunda' por debajo de la portería."""
+    p0 = _ball_at(ball, t0 + 0.05)
+    p1 = _ball_at(ball, t0 + 0.20)
+    vx, vy, vz = ((p1[i] - p0[i]) / 0.15 for i in range(3))
     if (target_y > 0 and vy <= 5) or (target_y < 0 and vy >= -5):
-        return None, None, speed_kmh
+        return None   # no va hacia la portería objetivo
     tt = (target_y - p1[1]) / vy
-    if not (0 < tt < 3.0):
-        return None, None, speed_kmh
-    x = p1[0] + vx * tt
-    z = p1[2] + vz * tt - 0.5 * GRAVITY * tt * tt
-    return round(x), round(z), speed_kmh
+    if not (0 < tt < 4.0):
+        return None
+    return round(p1[0] + vx * tt), round(p1[2] + vz * tt)
 
 
 def _is_on_target(x, z):
@@ -73,15 +95,20 @@ def compute_shots(frames: dict, touch_events: list) -> list:
         bm = s.get("ball_movement") or {}
         t1 = bm.get("end_time") or (t0 + 3.0)
 
-        x, z, speed = _target_on_goal(ball, t0, target_y)
+        # Resultado: gol/parada en la ventana del tiro (+margen para rebote/entrada)
+        goal_t = next((g.get("time") for g in goals
+                       if g.get("team") == team and t0 <= g.get("time", -1) <= t1 + 0.8), None)
+        save_t = next((sv.get("time") for sv in saves
+                       if bool(sv.get("is_team_0")) != team0 and t0 <= sv.get("time", -1) <= t1 + 0.8), None)
+        outcome = "gol" if goal_t is not None else "parada" if save_t is not None else "fuera"
 
-        # Resultado dentro de la ventana del tiro (+margen para el rebote/entrada)
-        goal  = any(g.get("team") == team and t0 <= g.get("time", -1) <= t1 + 0.6 for g in goals)
-        saved = any(bool(sv.get("is_team_0")) != team0 and t0 <= sv.get("time", -1) <= t1 + 0.6
-                    for sv in saves)
-        outcome = "gol" if goal else "parada" if saved else "fuera"
+        # Posición del impacto: cruce REAL del plano de portería (exacto para goles y para
+        # fueras que cruzan); si no cruza (lo paran antes), se estima la trayectoria.
+        t_max = (goal_t + 0.4) if goal_t is not None else \
+                (save_t + 0.4) if save_t is not None else (t0 + 2.5)
+        pt = _real_crossing(ball, t0, t_max, target_y) or _extrapolated(ball, t0, target_y)
+        x, z = pt if pt else (None, None)
 
-        # Distancia del tirador a la portería objetivo (m), para contexto
         bp = s.get("ball_position") or s.get("player_position")
         dist_m = uu_to_m(abs(target_y - bp[1])) if bp and len(bp) >= 2 else None
 
@@ -92,7 +119,7 @@ def compute_shots(frames: dict, touch_events: list) -> list:
             "target_z":   z,
             "on_target":  _is_on_target(x, z),
             "outcome":    outcome,
-            "speed_kmh":  speed,
+            "speed_kmh":  _speed_kmh(ball, t0),
             "dist_m":     dist_m,
             "time":       round(t0, 1),
         })

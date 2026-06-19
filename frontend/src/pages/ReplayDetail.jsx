@@ -450,35 +450,39 @@ const SHOT_LABEL = { gol: 'Gol', parada: 'Parada', fuera: 'Fuera' }
 
 function GoalSvg({ shots }) {
   // Geometría: boca de portería X∈[-893,893], Z∈[0,643] UU. Escala fija px/UU.
-  const S = 0.13, CX = 180, GROUND = 170
+  // viewBox ancho con margen para que los tiros FUERA se vean alrededor del marco.
+  const S = 0.12, CX = 230, GROUND = 185, W = 460, H = 250
   const gx = ux => CX + ux * S
   const gy = uz => GROUND - uz * S
-  const gw = 893 * S, gh = 643 * S      // medio ancho y alto en px
-  const left = CX - gw, right = CX + gw, top = GROUND - gh
+  const gw = 893 * S, gh = 643 * S
+  const left = CX - gw, top = GROUND - gh
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
   const plotted = shots.filter(s => s.target_x != null && s.target_z != null)
 
   return (
-    <svg viewBox="0 0 360 210" className="w-full" style={{ maxHeight: 280 }}>
-      {/* Suelo */}
-      <line x1="20" y1={GROUND} x2="340" y2={GROUND} stroke="#1A3A5C" strokeWidth="1.5" />
-      {/* Red (rejilla) */}
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 300 }}>
       <defs>
-        <pattern id="net" width="10" height="10" patternUnits="userSpaceOnUse">
-          <path d="M10 0H0V10" fill="none" stroke="#163150" strokeWidth="0.6" />
+        <pattern id="net" width="11" height="11" patternUnits="userSpaceOnUse">
+          <path d="M11 0H0V11" fill="none" stroke="#163150" strokeWidth="0.6" />
         </pattern>
       </defs>
-      <rect x={left} y={top} width={gw * 2} height={gh} fill="url(#net)" opacity="0.8" />
-      {/* Marco de portería */}
+      {/* Suelo (toda la anchura, para situar los tiros fuera a los lados) */}
+      <line x1="12" y1={GROUND} x2={W - 12} y2={GROUND} stroke="#1A3A5C" strokeWidth="1.5" />
+      {/* Red + marco de portería */}
+      <rect x={left} y={top} width={gw * 2} height={gh} fill="url(#net)" opacity="0.85" />
       <rect x={left} y={top} width={gw * 2} height={gh} fill="none" stroke="#3B6390" strokeWidth="2.5" />
-      {/* Puntos de tiro */}
-      {plotted.map((s, i) => (
-        <circle key={i} cx={gx(s.target_x)} cy={gy(s.target_z)} r="4.5"
-                fill={SHOT_COLOR[s.outcome] || '#888'} fillOpacity="0.85"
-                stroke="#04101E" strokeWidth="1">
-          <title>{`${s.player} · ${s.speed_kmh ?? '?'} km/h · ${SHOT_LABEL[s.outcome] || s.outcome}`
-                  + (s.dist_m != null ? ` · desde ${s.dist_m} m` : '')}</title>
-        </circle>
-      ))}
+      {/* Puntos de tiro (clamp para que los muy abiertos se vean en el borde) */}
+      {plotted.map((s, i) => {
+        const off = !s.on_target
+        return (
+          <circle key={i} cx={clamp(gx(s.target_x), 8, W - 8)} cy={clamp(gy(s.target_z), 8, H - 8)}
+                  r={off ? 4 : 4.8} fill={SHOT_COLOR[s.outcome] || '#888'}
+                  fillOpacity={off ? 0.7 : 0.9} stroke="#04101E" strokeWidth="1">
+            <title>{`${s.player} · ${s.speed_kmh ?? '?'} km/h · ${SHOT_LABEL[s.outcome] || s.outcome}`
+                    + (s.dist_m != null ? ` · desde ${s.dist_m} m` : '')}</title>
+          </circle>
+        )
+      })}
     </svg>
   )
 }

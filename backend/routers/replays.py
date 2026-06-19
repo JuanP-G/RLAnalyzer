@@ -446,6 +446,10 @@ def get_replay_advanced(replay_id: int, db: Session = Depends(get_db)):
 
 # ── Mapa de tiros (perezoso + caché en disco) ─────────────────────────────────
 
+# Sube esta versión si cambia el algoritmo de cálculo: invalida cachés viejas en disco.
+SHOTS_CACHE_VERSION = 2
+
+
 def _shots_cache_path(replay_id: int) -> str:
     import os
     from config import BASE_DIR
@@ -469,9 +473,11 @@ def get_replay_shots(replay_id: int, db: Session = Depends(get_db)):
     if os.path.exists(cache):
         try:
             with open(cache, encoding="utf-8") as f:
-                return json.load(f)
+                cached = json.load(f)
+            if cached.get("v") == SHOTS_CACHE_VERSION:   # versión actual → servir
+                return cached
         except Exception:
-            pass   # caché corrupta → recalcular
+            pass   # caché corrupta/vieja → recalcular
 
     if not r.file_path or not os.path.exists(r.file_path):
         return {"computed": False, "reason": "no_local_replay"}
@@ -495,7 +501,7 @@ def get_replay_shots(replay_id: int, db: Session = Depends(get_db)):
     for sh in shots:
         sh["player"] = id_to_name.get(_player_id_value(sh.pop("player_id"))) or "?"
 
-    result = {"computed": True, "my_team": r.my_team, "shots": shots}
+    result = {"computed": True, "v": SHOTS_CACHE_VERSION, "my_team": r.my_team, "shots": shots}
     try:
         with open(cache, "w", encoding="utf-8") as f:
             json.dump(result, f)
