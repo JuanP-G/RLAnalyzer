@@ -30,10 +30,9 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 | Herramienta | Versión mínima | Descarga |
 |-------------|----------------|----------|
 | Python | 3.10+ | https://python.org |
-| Node.js | 18+ | https://nodejs.org |
-| Rust (cargo) | estable | https://rustup.rs |
+| Node.js | 20+ | https://nodejs.org |
 
-> Rust solo es necesario para compilar `subtr-actor-py` la primera vez. Si ya está instalado en tu sistema, el setup lo detecta automáticamente.
+> Ya **no hace falta Rust**: `subtr-actor-py` se instala precompilado desde PyPI.
 >
 > `setup.bat` instala también **Playwright + Chromium** (~130 MB) para el perfil tracker.gg. Si la descarga falla, el resto de la app funciona con normalidad.
 
@@ -44,9 +43,12 @@ Aplicación de escritorio para analizar en profundidad tus partidas de Rocket Le
 ### 1. Clona el repositorio
 
 ```bash
-git clone https://github.com/TU_USUARIO/RLAnalyzer.git
+git clone https://github.com/JuanP-G/RLAnalyzer.git
 cd RLAnalyzer
 ```
+
+> Instala clonando con git (no descargando el ZIP): así la app **se actualiza sola** (ver
+> [Actualizaciones](#actualizaciones)).
 
 ### 2. Configura tus datos
 
@@ -74,8 +76,7 @@ setup.bat
 ```
 
 Esto instala automáticamente:
-- Dependencias Python (FastAPI, SQLAlchemy, etc.)
-- `subtr-actor-py` compilado desde fuente (puede tardar 5-10 min la primera vez)
+- Un **entorno virtual propio** (`.venv/`) con las dependencias Python (FastAPI, SQLAlchemy, `subtr-actor-py`, etc.). La app usa siempre ese intérprete, así que no le afecta qué otras versiones de Python tengas instaladas
 - **Playwright + Chromium** para el perfil tracker.gg (puede tardar 1-2 min)
 - Dependencias npm del frontend
 - Electron (wrapper de escritorio)
@@ -95,6 +96,25 @@ launch.vbs           # sin consola (modo normal)
 La app arranca el backend y el frontend automáticamente y los cierra al cerrar la ventana.
 
 **Primera vez sin replays** — si aún no tienes partidas procesadas, coloca algunos `.replay` en tu carpeta de Rocket League y la app los detectará y procesará en segundo plano.
+
+---
+
+## Actualizaciones
+
+La app comprueba si hay versión nueva en GitHub (rama `main`) **al abrirse y cada 6 horas**. Si la
+hay, muestra un aviso arriba y un toast de Windows. Con **Actualizar y reiniciar** (en el aviso o en
+**Ajustes ▸ Actualizaciones**):
+
+1. Cierra el backend y el frontend y guarda una **copia de la base de datos** en `data/backups/`
+   (se conservan las 3 últimas).
+2. Descarga los cambios (`git` fast-forward de `main`).
+3. Instala solo las dependencias que hayan cambiado (Python en `.venv`, npm del frontend; las de
+   Electron se instalan en el siguiente arranque desde `start-app.bat`).
+4. Reinicia la app.
+
+Si algo falla, vuelve sola a la versión anterior y lo indica en Ajustes. Tus datos (`data/`) nunca se
+tocan. Solo se actualiza sola una copia **en la rama `main` y sin cambios locales**; en una copia de
+desarrollo (otra rama o archivos modificados) avisa de que hay novedades pero no las aplica.
 
 ---
 
@@ -179,12 +199,12 @@ RLAnalyzer/
 |------|-----------|
 | Backend | Python 3 + FastAPI + Uvicorn |
 | Base de datos | SQLite + SQLAlchemy |
-| Parser de replays | subtr-actor-py (Rust → Python) |
-| Parser de frames | rrrocket.exe (network frames) |
-| Frontend | React 18 + Vite + Tailwind CSS |
+| Parser de replays | subtr-actor-py 1.5 (wheel precompilado de PyPI) |
+| Parser de frames | rrrocket.exe 0.11.9 (network frames) |
+| Frontend | React 19 + Vite 8 + Tailwind CSS 4 |
 | Visor 3D | Three.js + OrbitControls |
-| Gráficos | Recharts |
-| Desktop | Electron (frameless, custom titlebar) |
+| Gráficos | Recharts 3 |
+| Desktop | Electron 45 (frameless, custom titlebar) |
 | Perfil | tracker.gg API / web scraping / caché offline |
 
 ---
@@ -234,8 +254,8 @@ Desde el detalle de cualquier partida, pulsa **"Ver en 3D"** para abrir el visor
 ## Desarrollo
 
 ```bash
-# Backend (puerto 8000)
-cd backend && python main.py
+# Backend (puerto 8000) — con el intérprete del entorno virtual
+cd backend && ..\.venv\Scripts\python main.py
 
 # Frontend (puerto 5173)
 cd frontend && npm run dev

@@ -578,7 +578,7 @@ function TrendView({ trendData, trendBucket, setTrendBucket, trendMetric, setTre
         <div className="flex items-center gap-2">
           <span className="text-[11px] uppercase tracking-wider text-gray-500 font-display font-semibold">Métrica</span>
           <select value={trendMetric} onChange={e => setTrendMetric(e.target.value)}
-            className="text-xs rounded px-2 py-1 outline-none"
+            className="text-xs rounded px-2 py-1 outline-hidden"
             style={{ background: '#071829', border: '1px solid #122A4D', color: '#C2D6F5' }}>
             {GROUPS.map(g => (
               <optgroup key={g.id} label={g.label}>
@@ -702,7 +702,7 @@ function NumField({ label, value, onChange, min, step }) {
       <span className="text-[11px] text-gray-500">{label}</span>
       <input type="number" value={value} min={min} step={step}
         onChange={e => { const v = parseInt(e.target.value, 10); if (!Number.isNaN(v)) onChange(v) }}
-        className="w-16 text-xs rounded px-1.5 py-1 outline-none font-mono-num"
+        className="w-16 text-xs rounded px-1.5 py-1 outline-hidden font-mono-num"
         style={{ background: '#071829', border: '1px solid #122A4D', color: '#C2D6F5' }} />
     </label>
   )

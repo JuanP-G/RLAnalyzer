@@ -5,6 +5,35 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/).
 
 ---
 
+## [0.6.0] — 2026-11-17
+
+### Añadido
+- **Actualizaciones automáticas.** La app comprueba GitHub al abrirse y cada 6 h, avisa con un banner
+  y un toast, y con un clic descarga la nueva versión, instala solo las dependencias que cambiaron,
+  hace copia de la base de datos y se reinicia (vuelve atrás sola si algo falla). También en
+  **Ajustes ▸ Actualizaciones**, con la versión instalada y la lista de cambios.
+
+### Corregido
+- Al cerrar la app, Vite quedaba huérfano en Windows (solo se mataba el `cmd` que lo lanzaba).
+- **La app dejó de arrancar el backend tras instalar otra versión de Python.** Las dependencias estaban
+  en el Python global y `python` pasó a apuntar a otra instalación sin ellas. Ahora `setup.bat` crea un
+  **entorno virtual propio (`.venv/`)** y Electron lanza el backend con ese intérprete.
+
+### Cambiado
+- **Parsers al día:** `subtr-actor-py` 1.0.2 → **1.5.1** (ya se instala precompilado desde PyPI: se elimina
+  `install_subtr_actor.py` y el requisito de Rust) y `tools/rrrocket.exe` → **v0.11.9**.
+- **Backend:** FastAPI 0.163, SQLAlchemy 2.1, Uvicorn 0.54, watchdog 7, Playwright 1.65.
+- **Frontend:** React 19, React Router 7, Recharts 3, Three.js 0.187, Vite 8 y **Tailwind CSS 4**
+  (tema en `src/index.css` con `@theme`; se eliminan `tailwind.config.js` y `postcss.config.js`).
+- **Escritorio:** Electron 31 → **45**.
+
+### Cuando una actualización de Rocket League rompa el parseo
+1. Subir `subtr-actor-py` en `backend/requirements.txt` y ejecutar
+   `.venv\Scripts\python -m pip install -r backend/requirements.txt`.
+2. Sustituir `tools/rrrocket.exe` por la última release de https://github.com/nickbabcock/rrrocket.
+
+---
+
 ## [0.5.1] — 2026-06-18
 
 ### Corregido

@@ -69,7 +69,7 @@ function StarButton({ isFav, onClick }) {
     <button
       onClick={onClick}
       title={isFav ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-      className="transition-transform hover:scale-125 focus:outline-none"
+      className="transition-transform hover:scale-125 focus:outline-hidden"
       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
     >
       {isFav
@@ -145,7 +145,7 @@ function PlayStylePie({ ps }) {
         {data.map(d => (
           <div key={d.name} className="text-center">
             <div className="flex items-center gap-1.5 justify-center">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
+              <span className="w-2.5 h-2.5 rounded-xs" style={{ background: d.color }} />
               <span className="text-[11px] text-gray-400">{d.name}</span>
             </div>
             <p className="font-mono-num font-bold text-sm mt-0.5" style={{ color: d.color }}>

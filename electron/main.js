@@ -3,6 +3,7 @@ const fs = require('fs')
 const { spawn, execFileSync }        = require('child_process')
 const path                           = require('path')
 const http                           = require('http')
+const { createUpdater }              = require('./updater')
 
 const ROOT = path.join(__dirname, '..')
 
@@ -71,8 +72,21 @@ async function startBackend() {
 }
 
 // Lanza el proceso del backend (sin comprobar si ya está arriba)
+// Intérprete del backend: el del entorno virtual del proyecto (.venv, lo crea setup.bat).
+// Así la app no depende de qué "python" haya primero en el PATH: instalar otra versión de
+// Python en el sistema dejaba al backend sin sus dependencias. Solo si no existe el venv
+// se cae al python global.
+function backendPython() {
+  const venvPy = process.platform === 'win32'
+    ? path.join(ROOT, '.venv', 'Scripts', 'python.exe')
+    : path.join(ROOT, '.venv', 'bin', 'python')
+  if (fs.existsSync(venvPy)) return venvPy
+  console.warn('[backend] no existe .venv; usando el python del PATH (ejecuta setup.bat)')
+  return process.platform === 'win32' ? 'python' : 'python3'
+}
+
 function spawnBackend() {
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
+  const pythonCmd = backendPython()
   backendProc = spawn(pythonCmd, ['main.py'], {
     cwd:      path.join(ROOT, 'backend'),
     stdio:    'pipe',
@@ -112,7 +126,7 @@ async function restartBackend() {
     let done = false
     const finish = () => { if (!done) { done = true; resolve() } }
     old.once('exit', finish)
-    try { old.kill() } catch (_) {}
+    killTree(old)   // el python.exe del .venv es un lanzador: hay que matar también su hijo
     setTimeout(finish, 4000)   // fallback por si no emite 'exit'
   })
   await new Promise(r => setTimeout(r, 1000))   // dar tiempo a liberar el puerto :8000
@@ -151,11 +165,32 @@ function destroyBcView() {
   bcView = null
 }
 
+// ── Mata un proceso hijo con todo su árbol ────────────────────────────────────
+// En Windows, frontendProc es un cmd.exe (shell:true) y .kill() solo mata ese cmd: Vite y
+// esbuild quedaban huérfanos ocupando :5173 y bloqueando frontend/node_modules.
+function killTree(proc) {
+  if (!proc || proc.exitCode !== null) return
+  if (process.platform === 'win32' && proc.pid) {
+    try { execFileSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); return }
+    catch (_) { /* ya había terminado */ }
+  }
+  try { proc.kill() } catch (_) {}
+}
+
+// Espera a que un proceso termine (o hasta timeout)
+function waitExit(proc, timeoutMs = 5000) {
+  if (!proc || proc.exitCode !== null) return Promise.resolve()
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, timeoutMs)
+    proc.once('exit', () => { clearTimeout(t); resolve() })
+  })
+}
+
 // ── Mata todos los procesos hijo ──────────────────────────────────────────────
 function killAll() {
   destroyBcView()
-  try { if (backendProc)  backendProc.kill()  } catch (_) {}
-  try { if (frontendProc) frontendProc.kill() } catch (_) {}
+  killTree(backendProc)
+  killTree(frontendProc)
 }
 
 // ── Crea la ventana principal ─────────────────────────────────────────────────
@@ -201,7 +236,38 @@ async function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null })
 
   // Muestra una pantalla de carga mientras arrancan los servidores
-  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+  showLoadingScreen('Iniciando servicios…')
+
+  mainWindow.show()
+
+  await startServicesAndLoad()
+
+  // Comprueba si hay actualizaciones un rato después de arrancar y luego cada pocas horas
+  setTimeout(backgroundUpdateCheck, 20_000)
+  setInterval(backgroundUpdateCheck, UPDATE_CHECK_EVERY_MS)
+}
+
+// Arranca backend y frontend (reutilizándolos si ya corren) y carga la interfaz
+async function startServicesAndLoad() {
+  await Promise.all([startBackend(), startFrontend()])
+  try {
+    await Promise.all([
+      waitForServer(`${BACKEND_URL}/api/status`),
+      waitForServer(FRONTEND_URL),
+    ])
+    console.log('[electron] Servidores listos, cargando app...')
+  } catch (err) {
+    console.error('[electron] Error esperando servidores:', err.message)
+    // Intenta cargar de todos modos
+  }
+  if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
+}
+
+// Pantalla de carga (data URL, no depende de Vite). El texto se puede cambiar después
+// con setLoadingMessage (se usa durante las actualizaciones).
+function showLoadingScreen(message) {
+  if (!mainWindow) return Promise.resolve()
+  return mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8">
@@ -230,29 +296,102 @@ async function createWindow() {
       <div class="spinner"></div>
       <br>
       <h1>RLAnalyzer</h1>
-      <p>Iniciando servicios…</p>
+      <p id="msg">${escapeHtml(message)}</p>
     </body>
     </html>
-  `)}`)
+  `)}`).catch(() => {})
+}
 
-  mainWindow.show()
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
 
-  // Arranca backend y frontend en paralelo (esperan si ya corren)
-  await Promise.all([startBackend(), startFrontend()])
+function setLoadingMessage(message) {
+  mainWindow?.webContents
+    .executeJavaScript(`document.getElementById('msg') && (document.getElementById('msg').textContent = ${JSON.stringify(message)})`)
+    .catch(() => {})
+}
 
-  // Espera a que estén listos
-  try {
-    await Promise.all([
-      waitForServer(`${BACKEND_URL}/api/status`),
-      waitForServer(FRONTEND_URL),
-    ])
-    console.log('[electron] Servidores listos, cargando app...')
-    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
-  } catch (err) {
-    console.error('[electron] Error esperando servidores:', err.message)
-    // Intenta cargar de todos modos
-    if (mainWindow) mainWindow.loadURL(FRONTEND_URL)
+// ── Actualizaciones ───────────────────────────────────────────────────────────
+// La app corre desde un clon de git: actualizar = fast-forward de main + dependencias que
+// hayan cambiado + relanzar (main.js también puede haber cambiado). Ver updater.js.
+const UPDATE_CHECK_EVERY_MS = 6 * 60 * 60 * 1000
+const updater = createUpdater({ root: ROOT, python: backendPython(), log: console.log })
+let lastCheck    = null    // último resultado de updater.check()
+let lastNotified = null    // sha remoto del que ya se avisó con un toast
+let updating     = false
+let lastUpdateError = null
+
+async function checkForUpdates() {
+  lastCheck = await updater.check()
+  console.log('[update]', lastCheck.state, lastCheck.behind ?? '', lastCheck.error ?? lastCheck.blocked ?? '')
+  return lastCheck
+}
+
+async function backgroundUpdateCheck() {
+  if (updating) return
+  const r = await checkForUpdates()
+  if (r.state !== 'available') return
+  mainWindow?.webContents.send('update:available', r)
+  if (lastNotified !== r.remote && Notification.isSupported()) {
+    lastNotified = r.remote
+    const n = new Notification({
+      title: 'RLAnalyzer: actualización disponible',
+      body:  `${r.behind} cambio(s) nuevos. Ábrela desde Ajustes ▸ Actualizaciones.`,
+      icon:  NOTIFY_ICON,
+    })
+    n.on('click', () => mainWindow?.show())
+    n.show()
   }
+}
+
+// Para backend y frontend. Solo se puede si los lanzó esta app (si no, no podemos
+// garantizar que suelten los archivos que hay que reemplazar).
+async function stopServices() {
+  if (!backendProc || !frontendProc) {
+    throw new Error('El backend o el frontend se lanzaron fuera de la app. Ciérralos y vuelve a intentarlo.')
+  }
+  const procs = [backendProc, frontendProc]
+  backendProc = frontendProc = null
+  destroyBcView()
+  procs.forEach(killTree)
+  await Promise.all(procs.map(p => waitExit(p)))
+  await new Promise(r => setTimeout(r, 1000))   // margen para que Windows libere archivos y puertos
+}
+
+// Relanza la app por start-app.bat (vía launch.vbs, sin consola): así, si cambiaron las
+// dependencias de Electron, se instalan cuando este proceso ya ha salido.
+function relaunchApp() {
+  const vbs = path.join(ROOT, 'launch.vbs')
+  if (process.platform === 'win32' && fs.existsSync(vbs)) {
+    spawn('wscript.exe', [vbs], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  } else {
+    app.relaunch()
+  }
+  app.exit(0)
+}
+
+async function applyUpdate() {
+  if (updating) return { ok: false, error: 'Ya se está actualizando' }
+  if (!backendProc || !frontendProc) {
+    return { ok: false, error: 'El backend o el frontend se lanzaron fuera de la app. Ciérralos y abre RLAnalyzer de nuevo para actualizar.' }
+  }
+  updating = true
+  lastUpdateError = null
+  await showLoadingScreen('Actualizando…')
+  const result = await updater.apply({ stopServices, onProgress: setLoadingMessage })
+  if (result.ok) {
+    setLoadingMessage('Actualizado. Reiniciando…')
+    setTimeout(relaunchApp, 800)
+    return result
+  }
+  // Fallo: la versión anterior está restaurada (o no se llegó a tocar). Volver a arrancar.
+  lastUpdateError = result.error
+  console.error('[update] fallo:', result.error, '| revertido:', result.rolledBack)
+  setLoadingMessage('No se pudo actualizar. Volviendo a la versión actual…')
+  updating = false
+  await startServicesAndLoad()
+  return result
 }
 
 // ── IPC: controles de ventana ─────────────────────────────────────────────────
@@ -298,6 +437,19 @@ ipcMain.handle('dialog:selectFolder', async () => {
 })
 
 ipcMain.handle('backend:restart', () => restartBackend())
+
+// ── IPC: actualizaciones ──────────────────────────────────────────────────────
+ipcMain.handle('update:status', async () => ({
+  local:     await updater.localState().catch(e => ({ supported: false, reason: 'error', error: e.message })),
+  lastCheck,
+  lastError: lastUpdateError,
+  managed:   !!(backendProc && frontendProc),
+}))
+ipcMain.handle('update:check', () => checkForUpdates())
+ipcMain.handle('update:apply', () => {
+  console.log('[update] aplicación solicitada desde la interfaz')   // nunca se aplica sin pulsar
+  return applyUpdate()
+})
 
 // ── IPC: notificaciones del sistema (toast nativo de Windows/macOS) ───────────
 // Se disparan desde el proceso PRINCIPAL (no con el new Notification() del renderer):

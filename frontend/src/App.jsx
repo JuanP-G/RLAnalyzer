@@ -12,6 +12,7 @@ import PlayerHistory from './pages/PlayerHistory'
 import Analysis from './pages/Analysis'
 import Compare from './pages/Compare'
 import SettingsModal from './components/SettingsModal'
+import UpdateBanner from './components/UpdateBanner'
 import { api } from './api'
 
 export default function App() {
@@ -69,6 +70,7 @@ export default function App() {
     <div className="flex flex-col h-screen overflow-hidden bg-bg-primary">
       {/* Barra de título personalizada (solo visible en Electron) */}
       <TitleBar />
+      <UpdateBanner onOpenSettings={() => setSettingsOpen(true)} />
 
       {/* Contenido principal */}
       <div className="flex flex-1 overflow-hidden">

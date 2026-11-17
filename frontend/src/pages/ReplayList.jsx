@@ -40,7 +40,7 @@ function StarButton({ isFav, onClick }) {
     <button
       onClick={onClick}
       title={isFav ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-      className="transition-transform hover:scale-125 focus:outline-none"
+      className="transition-transform hover:scale-125 focus:outline-hidden"
       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
     >
       {isFav

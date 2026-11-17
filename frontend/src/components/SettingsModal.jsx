@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, invalidateProfileCache } from '../api'
+import UpdatePanel from './UpdatePanel'
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 
@@ -179,7 +180,7 @@ export default function SettingsModal({ onClose, onSaved }) {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Nombre exacto en Rocket League"
-                  className="w-full text-sm rounded-md px-3 py-2 outline-none"
+                  className="w-full text-sm rounded-md px-3 py-2 outline-hidden"
                   style={inputStyle}
                 />
                 <datalist id="known-players">
@@ -196,7 +197,7 @@ export default function SettingsModal({ onClose, onSaved }) {
                     value={folder}
                     onChange={e => setFolder(e.target.value)}
                     placeholder="C:\\…\\Rocket League\\TAGame\\DemosEpic"
-                    className="flex-1 text-sm rounded-md px-3 py-2 outline-none font-mono-num"
+                    className="flex-1 text-sm rounded-md px-3 py-2 outline-hidden font-mono-num"
                     style={inputStyle}
                   />
                   {isElectron && (
@@ -269,6 +270,12 @@ export default function SettingsModal({ onClose, onSaved }) {
                   Probar notificación
                 </button>
               </Section>
+
+              {isElectron && (
+                <Section title="Actualizaciones" desc="Descarga las mejoras publicadas en GitHub y reinicia la app.">
+                  <UpdatePanel />
+                </Section>
+              )}
 
               <Section title="Avanzado" desc="Estos valores solo cambian editando la configuración y reiniciando el backend.">
                 <div className="text-xs text-gray-500 space-y-1 font-mono-num">

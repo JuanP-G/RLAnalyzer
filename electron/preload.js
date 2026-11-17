@@ -21,6 +21,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reinicia el backend en segundo plano (sin cerrar la ventana)
   restartBackend:     ()         => ipcRenderer.invoke('backend:restart'),
 
+  // Actualizaciones de la app (git fast-forward de main; ver electron/updater.js)
+  updateStatus:      ()   => ipcRenderer.invoke('update:status'),
+  checkForUpdates:   ()   => ipcRenderer.invoke('update:check'),
+  applyUpdate:       ()   => ipcRenderer.invoke('update:apply'),
+  onUpdateAvailable: (cb) => {
+    const h = (_e, info) => cb(info)
+    ipcRenderer.on('update:available', h)
+    return () => ipcRenderer.removeListener('update:available', h)
+  },
+
   // Notificación del sistema (toast nativo, vía proceso principal)
   notify:             (title, body) => ipcRenderer.invoke('notify:show', { title, body }),
 
