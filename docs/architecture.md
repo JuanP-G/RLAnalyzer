@@ -12,7 +12,7 @@ RLAnalyzer es una aplicación de escritorio Windows que procesa archivos `.repla
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Electron (main.js)                       │
 │  ┌──────────────────────┐    ┌──────────────────────────────┐   │
-│  │  React 18 + Vite     │    │  FastAPI + Uvicorn           │   │
+│  │  React 19 + Vite     │    │  FastAPI + Uvicorn           │   │
 │  │  (puerto 5173)       │◄──►│  (puerto 8000)               │   │
 │  │                      │    │                              │   │
 │  │  Dashboard           │    │  /api/replays                │   │
@@ -40,13 +40,26 @@ RLAnalyzer es una aplicación de escritorio Windows que procesa archivos `.repla
 Shell de escritorio. Responsabilidades:
 
 - Crea la ventana frameless (sin barra de título nativa)
-- Spawns del proceso backend (`python main.py`) y frontend (`npm run dev` o dist)
+- Spawns del proceso backend (`.venv/Scripts/python main.py`; solo si no existe el venv cae al `python` del PATH) y frontend (`npm run dev` o dist)
 - Cierra ambos procesos cuando el usuario cierra la ventana
 - Expone IPC a la UI vía `preload.js` (contextIsolation activado):
   - `minimize / maximize / close / isMaximized / onMaximizeChange`
   - `showReplayInFolder(path)` — abre el explorador con el `.replay` seleccionado
   - `exportReplay(path)` — copia el archivo a una ruta elegida por el usuario
   - `bcViewOpen(url, bounds) / bcViewSetBounds(bounds) / bcViewClose()` — controla un `WebContentsView` que embebe el visor de Ballchasing
+  - `updateStatus() / checkForUpdates() / applyUpdate() / onUpdateAvailable(cb)` — actualizador
+
+**Actualizador (`electron/updater.js`):**
+No hay instalador: la app corre desde un clon de git. El actualizador hace `git fetch` de `main`
+desde la URL pública del repo (no desde `origin`, para no depender de credenciales guardadas; se
+puede cambiar con `RL_UPDATE_URL`) a la ref `refs/rlanalyzer/update` y compara con `HEAD`. Solo
+aplica si la copia está en `main`, sin cambios en archivos con seguimiento y sin commits propios.
+Al aplicar: para backend y frontend (con `taskkill /T`, que en Windows `kill()` dejaba Vite
+huérfano), copia `data/rl_data.db` a `data/backups/`, `git merge --ff-only`, `pip install` si cambió
+`backend/requirements.txt`, `npm ci` en `frontend/` si cambió su `package*.json`, y deja la marca
+`electron/.needs-npm-install` si cambió el de Electron (está en uso; lo instala `start-app.bat`).
+Después relanza por `launch.vbs`. Si una instalación falla: `git reset --hard` al commit anterior y
+reinstalación. Es un módulo de Node sin Electron, con pruebas en `electron/test/` (`npm test`).
 
 **Visor embebido de Ballchasing (`WebContentsView`):**
 El visor 3D de Ballchasing necesita WebGL/GPU real, que un `<webview>` no garantiza. Por eso se usa un `WebContentsView` adjunto a la ventana principal (misma ruta de render de Chromium), posicionado sobre la zona del visor de React mediante `setBounds`. Los popups/enlaces externos se abren en el navegador del sistema. La vista se destruye al cerrar el visor o la app.
@@ -57,7 +70,7 @@ El visor 3D de Ballchasing necesita WebGL/GPU real, que un `<webview>` no garant
 
 ### 2. Frontend (`frontend/`)
 
-React 18 con Vite. Sin state manager global (todo local con `useState`/`useEffect`).
+React 19 con Vite 8. Sin state manager global (todo local con `useState`/`useEffect`).
 
 **Rutas:**
 
@@ -79,7 +92,7 @@ privacidad, actualizaciones…). Jugador principal (multi-perfil) y carpeta de r
 
 **Cliente HTTP (`api.js`):** caché en memoria por URL con TTL 60s. Todas las peticiones van a `http://localhost:8000`.
 
-**Estilos:** Tailwind CSS utility-first. Colores base: azul oscuro (`#0A1929`), naranja (`#FF7A00`), acento azul (`#3A8EFF`).
+**Estilos:** Tailwind CSS 4 utility-first (el tema vive en `src/index.css` con `@theme`; ya no hay `tailwind.config.js`). Colores base: azul oscuro (`#0A1929`), naranja (`#FF7A00`), acento azul (`#3A8EFF`).
 
 **Componentes compartidos:**
 - `TitleBar.jsx` — barra de título personalizada con controles min/max/close vía IPC
@@ -208,7 +221,7 @@ Un registro por jugador por partida. Campos: `player_name`, `platform_id`, `team
 
 ### Fase 1 — Metadata y stats (subtr-actor-py)
 
-`parser.py` invoca la binding Python de `subtr-actor` (compilada con Rust/cargo). Extrae del header del replay:
+`parser.py` invoca la binding Python de `subtr-actor` (wheel precompilado de PyPI, fijado en `requirements.txt`). Extrae del header del replay:
 - Metadata: mapa, modo, tamaño de equipos, fecha, duración
 - Stats de jugadores: goles, asistencias, paradas, tiros, boost, velocidades
 - Resultado: determinado comparando qué equipo tiene más goles y en qué equipo está `PLAYER_NAME`

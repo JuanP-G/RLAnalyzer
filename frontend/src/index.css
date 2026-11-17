@@ -1,6 +1,52 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tema (Tailwind 4: la configuración vive aquí, ya no hay tailwind.config.js) */
+@theme {
+  --font-sans:    'Inter', system-ui, sans-serif;
+  --font-display: 'Rajdhani', 'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  --color-bg-primary:   #04101E;  /* navy oscuro — fondo de página */
+  --color-bg-secondary: #071829;  /* navy medio — tarjetas, paneles */
+  --color-bg-tertiary:  #0D2240;  /* navy elevado — cabeceras de tabla, hover */
+  --color-bg-hover:     #122A4D;  /* hover de fila */
+
+  --color-rl-blue:   #00A8FF;  /* azul RL eléctrico */
+  --color-rl-cyan:   #4FC3F7;  /* azul secundario claro */
+  --color-rl-orange: #F4620F;  /* naranja equipo */
+  --color-rl-gold:   #FFB800;  /* dorado / campeón */
+
+  --color-win:  #3DDB85;
+  --color-loss: #FF4757;
+  --color-draw: #7B91B0;
+
+  /* Escala de grises con tinte azul — da el feel de RL */
+  --color-gray-50:  #F0F6FF;
+  --color-gray-100: #E4EEFF;
+  --color-gray-200: #C2D6F5;
+  --color-gray-300: #94B4DC;
+  --color-gray-400: #6590BC;
+  --color-gray-500: #5888B4;  /* +contraste para labels y cabeceras */
+  --color-gray-600: #3D6A94;  /* +contraste para texto secundario */
+  --color-gray-700: #245070;  /* +contraste para texto decorativo */
+  --color-gray-800: #0C2040;
+  --color-gray-900: #060F20;
+}
+
+/* Compatibilidad con los valores por defecto de Tailwind 3 (en v4 cambiaron):
+   color de borde por defecto, cursor de los botones y color del placeholder. */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  input::placeholder, textarea::placeholder {
+    opacity: 1;
+    color: var(--color-gray-400);
+  }
+}
 
 @layer base {
   body {
@@ -19,15 +65,13 @@
   ::-webkit-scrollbar-thumb:hover { background: #1E4068; }
 }
 
-@layer utilities {
-  .font-mono-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
-  }
-  .glow-blue  { box-shadow: 0 0 16px rgba(0, 168, 255, 0.25); }
-  .glow-green { box-shadow: 0 0 16px rgba(61, 219, 133, 0.20); }
-  .glow-red   { box-shadow: 0 0 16px rgba(255, 71,  87, 0.20); }
+@utility font-mono-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
 }
+@utility glow-blue  { box-shadow: 0 0 16px rgba(0, 168, 255, 0.25); }
+@utility glow-green { box-shadow: 0 0 16px rgba(61, 219, 133, 0.20); }
+@utility glow-red   { box-shadow: 0 0 16px rgba(255, 71,  87, 0.20); }
 
 /* ── Animaciones ──────────────────────────────────────────────── */
 @keyframes fadeUp {

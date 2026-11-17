@@ -2,6 +2,8 @@
 # Uso:  .\run_tests.ps1
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
-py -m pip install -q -r requirements-dev.txt
-py -m pytest tests -v
+$py = Join-Path $PSScriptRoot "..\.venv\Scripts\python.exe"
+if (-not (Test-Path $py)) { $py = "py" }   # sin venv: python global
+& $py -m pip install -q -r requirements-dev.txt
+& $py -m pytest tests -v
 exit $LASTEXITCODE

@@ -26,6 +26,7 @@ dist/
 
 # Electron build output
 electron/node_modules/
+electron/.needs-npm-install
 out/
 release/
 

@@ -9,7 +9,7 @@ echo.
 cd /d "%~dp0"
 
 :: ── 1. Python ────────────────────────────────────────────────────────────────
-echo [1/5] Comprobando Python...
+echo [1/6] Comprobando Python...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo  ERROR: Python no encontrado.
@@ -20,7 +20,7 @@ python --version
 
 :: ── 2. Node.js ───────────────────────────────────────────────────────────────
 echo.
-echo [2/5] Comprobando Node.js...
+echo [2/6] Comprobando Node.js...
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo  ERROR: Node.js no encontrado.
@@ -29,42 +29,37 @@ if %errorlevel% neq 0 (
 )
 node --version
 
-:: ── 3. Dependencias Python ───────────────────────────────────────────────────
+:: ── 3. Dependencias Python (entorno virtual propio en .venv) ─────────────────
 echo.
-echo [3/5] Instalando dependencias Python...
+echo [3/6] Creando entorno virtual e instalando dependencias Python...
 
-if exist "%USERPROFILE%\.cargo\bin\cargo.exe" (
-    set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
+cd /d "%~dp0"
+if not exist ".venv\Scripts\python.exe" (
+    python -m venv .venv
+    if %errorlevel% neq 0 (
+        echo  ERROR: No se pudo crear el entorno virtual .venv.
+        pause & exit /b 1
+    )
 )
+set "VENV_PY=%~dp0.venv\Scripts\python.exe"
 
-cd /d "%~dp0backend"
-pip install -r requirements.txt
+"%VENV_PY%" -m pip install --upgrade pip >nul 2>&1
+"%VENV_PY%" -m pip install -r backend
+equirements.txt
 if %errorlevel% neq 0 (
     echo  ERROR: Fallo instalando dependencias Python.
     pause & exit /b 1
 )
 
-:: subtr-actor-py
-cd /d "%~dp0"
-python install_subtr_actor.py
-if %errorlevel% neq 0 (
-    echo  AVISO: No se pudo instalar subtr-actor-py ^(requiere Rust^).
-    echo  Instala Rust con: winget install Rustlang.Rustup
-    echo  Luego vuelve a ejecutar este setup.
-    pause & exit /b 1
-)
-
 :: ── 4. Playwright (navegador headless para perfil tracker.gg) ────────────────
 echo.
-echo [4/6] Instalando Playwright y Chromium ^(perfil tracker.gg^)...
+echo [4/6] Instalando Chromium para Playwright ^(perfil tracker.gg^)...
 echo  ^(puede tardar 1-2 minutos la primera vez — descarga ~130MB^)
-pip install playwright >nul 2>&1
-python -m playwright install chromium
+"%VENV_PY%" -m playwright install chromium
 if %errorlevel% neq 0 (
     echo  AVISO: No se pudo instalar Chromium para Playwright.
     echo  El perfil tracker.gg no estara disponible hasta instalar manualmente:
-    echo    pip install playwright
-    echo    python -m playwright install chromium
+    echo    .venv\Scripts\python -m playwright install chromium
     echo  El resto de la app funciona con normalidad.
 )
 
@@ -73,12 +68,12 @@ echo.
 echo [5/6] Instalando dependencias frontend y Electron...
 
 cd /d "%~dp0frontend"
-call npm install
-if %errorlevel% neq 0 ( echo  ERROR en npm install frontend. & pause & exit /b 1 )
+call npm ci --no-audit --no-fund
+if %errorlevel% neq 0 ( echo  ERROR en npm ci frontend. & pause & exit /b 1 )
 
 cd /d "%~dp0electron"
-call npm install
-if %errorlevel% neq 0 ( echo  ERROR en npm install electron. & pause & exit /b 1 )
+call npm ci --no-audit --no-fund
+if %errorlevel% neq 0 ( echo  ERROR en npm ci electron. & pause & exit /b 1 )
 
 :: ── 6. Acceso directo en escritorio ──────────────────────────────────────────
 echo.
@@ -98,12 +93,10 @@ echo.
 echo  ================================================
 echo   Instalacion completada correctamente!
 echo.
-echo   Antes de abrir la app, edita:
-echo     backend\config.py
-echo       PLAYER_NAME    = tu nombre en Rocket League
-echo       REPLAYS_FOLDER = ruta a tu carpeta de replays
+echo   Configura tu jugador y la carpeta de replays desde
+echo   el boton de Ajustes dentro de la app.
 echo.
-echo   Luego abre la app con el icono del escritorio
+echo   Abre la app con el icono del escritorio
 echo   o ejecutando start-app.bat
 echo  ================================================
 echo.
